@@ -36,6 +36,10 @@
           "type": "registry:component"
         },
         {
+          "path": "src/components/atomic-crm/types/rbac.ts",
+          "type": "registry:component"
+        },
+        {
           "path": "src/components/atomic-crm/tasks/taskFilters.ts",
           "type": "registry:component"
         },
@@ -161,6 +165,26 @@
         },
         {
           "path": "src/components/atomic-crm/root/CRM.tsx",
+          "type": "registry:component"
+        },
+        {
+          "path": "src/components/atomic-crm/rbac/index.ts",
+          "type": "registry:component"
+        },
+        {
+          "path": "src/components/atomic-crm/rbac/TeamManager.tsx",
+          "type": "registry:component"
+        },
+        {
+          "path": "src/components/atomic-crm/rbac/RoleResource.tsx",
+          "type": "registry:component"
+        },
+        {
+          "path": "src/components/atomic-crm/rbac/RolePermissionsEditor.tsx",
+          "type": "registry:component"
+        },
+        {
+          "path": "src/components/atomic-crm/rbac/RBACAdminPage.tsx",
           "type": "registry:component"
         },
         {
@@ -685,6 +709,10 @@
         },
         {
           "path": "src/components/atomic-crm/contacts/ContactEdit.tsx",
+          "type": "registry:component"
+        },
+        {
+          "path": "src/components/atomic-crm/contacts/ContactDataGrid.tsx",
           "type": "registry:component"
         },
         {
