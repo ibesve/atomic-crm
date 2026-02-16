@@ -20,6 +20,8 @@ import {
 import { TableCell } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
 
+const EMPTY_VALUE = "__none__";
+
 interface EditableCellProps<RecordType extends RaRecord = RaRecord> {
   source: string;
   resource: string;
@@ -43,6 +45,7 @@ export function EditableCell<RecordType extends RaRecord = RaRecord>({
 }: EditableCellProps<RecordType>) {
   const record = useRecordContext<RecordType>();
   const [isEditing, setIsEditing] = useState(false);
+  const [selectOpen, setSelectOpen] = useState(false);
   const [value, setValue] = useState<any>(null);
   const [originalValue, setOriginalValue] = useState<any>(null);
   const [update, { isPending }] = useUpdate();
@@ -90,6 +93,9 @@ export function EditableCell<RecordType extends RaRecord = RaRecord>({
     if (!isEditing) return;
 
     const handleClickOutside = (event: MouseEvent) => {
+      // Nicht schließen wenn der Select-Dropdown offen ist
+      if (selectOpen) return;
+      
       if (cellRef.current && !cellRef.current.contains(event.target as Node)) {
         saveChanges();
       }
@@ -98,13 +104,13 @@ export function EditableCell<RecordType extends RaRecord = RaRecord>({
     // Verzögert hinzufügen, damit der initiale Klick nicht abgefangen wird
     const timeoutId = setTimeout(() => {
       document.addEventListener("mousedown", handleClickOutside);
-    }, 0);
+    }, 100);
 
     return () => {
       clearTimeout(timeoutId);
       document.removeEventListener("mousedown", handleClickOutside);
     };
-  }, [isEditing, saveChanges]);
+  }, [isEditing, saveChanges, selectOpen]);
 
   const startEditing = useCallback(
     (e: React.MouseEvent) => {
@@ -114,16 +120,59 @@ export function EditableCell<RecordType extends RaRecord = RaRecord>({
         setValue(currentVal);
         setOriginalValue(currentVal);
         setIsEditing(true);
+        // Bei Select/Reference sofort den Dropdown öffnen
+        if (type === "select" || type === "reference") {
+          setTimeout(() => setSelectOpen(true), 50);
+        }
       }
     },
-    [record, source]
+    [record, source, type]
   );
 
   const cancelEditing = useCallback((e: React.MouseEvent) => {
     e.stopPropagation();
     setIsEditing(false);
+    setSelectOpen(false);
     setValue(originalValue);
   }, [originalValue]);
+
+  // Handler für Select-Änderungen - speichert sofort
+  const handleSelectChange = useCallback((newValue: string) => {
+    const parsedValue = newValue === EMPTY_VALUE ? null : 
+      (type === "reference" ? parseInt(newValue) : newValue);
+    setValue(parsedValue);
+    setSelectOpen(false);
+    
+    // Sofort speichern nach Auswahl
+    if (!record || parsedValue === originalValue) {
+      setIsEditing(false);
+      return;
+    }
+
+    update(
+      resource,
+      {
+        id: record.id,
+        data: { [source]: parsedValue },
+        previousData: record,
+      },
+      {
+        onSuccess: () => {
+          notify(translate("ra.notification.updated", { smart_count: 1 }), {
+            type: "success",
+          });
+          setIsEditing(false);
+          refresh();
+        },
+        onError: (error: any) => {
+          notify(error.message || translate("ra.notification.http_error"), {
+            type: "error",
+          });
+          setIsEditing(false);
+        },
+      }
+    );
+  }, [record, resource, source, originalValue, type, update, notify, translate, refresh]);
 
   if (!record) return null;
 
@@ -139,15 +188,16 @@ export function EditableCell<RecordType extends RaRecord = RaRecord>({
         <div className="flex items-center gap-1">
           {type === "select" && options ? (
             <Select 
-              value={value?.toString() || ""} 
-              onValueChange={(v) => {
-                setValue(v);
-              }}
+              open={selectOpen}
+              onOpenChange={setSelectOpen}
+              value={value?.toString() || EMPTY_VALUE} 
+              onValueChange={handleSelectChange}
             >
               <SelectTrigger className="h-8 w-full">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
+                <SelectItem value={EMPTY_VALUE}>-</SelectItem>
                 {options.map((opt) => (
                   <SelectItem key={opt.value} value={opt.value}>
                     {opt.label}
@@ -157,21 +207,21 @@ export function EditableCell<RecordType extends RaRecord = RaRecord>({
             </Select>
           ) : type === "reference" && referenceData ? (
             <Select
-              value={value?.toString() || ""}
-              onValueChange={(v) => {
-                setValue(v ? parseInt(v) : null);
-              }}
+              open={selectOpen}
+              onOpenChange={setSelectOpen}
+              value={value?.toString() || EMPTY_VALUE}
+              onValueChange={handleSelectChange}
             >
               <SelectTrigger className="h-8 w-full">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">-</SelectItem>
+                <SelectItem value={EMPTY_VALUE}>-</SelectItem>
                 {referenceData.map((item) => (
                   <SelectItem key={item.id} value={item.id.toString()}>
-                    {item.name || item.first_name
+                    {item.name || (item.first_name
                       ? `${item.first_name} ${item.last_name}`
-                      : item.id}
+                      : item.id)}
                   </SelectItem>
                 ))}
               </SelectContent>

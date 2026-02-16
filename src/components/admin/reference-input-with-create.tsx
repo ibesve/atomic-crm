@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import {
   useCreate,
   useGetList,
@@ -6,7 +6,7 @@ import {
   useTranslate,
   RaRecord,
 } from "ra-core";
-import { Plus, X, ChevronDown } from "lucide-react";
+import { Plus, X, ChevronDown, Loader2, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -42,6 +42,8 @@ interface ReferenceInputWithCreateProps {
   allowCreate?: boolean;
 }
 
+const EMPTY_VALUE = "__none__";
+
 export function ReferenceInputWithCreate({
   reference,
   label,
@@ -55,9 +57,21 @@ export function ReferenceInputWithCreate({
 }: ReferenceInputWithCreateProps) {
   const translate = useTranslate();
   const notify = useNotify();
-  const [create, { isPending: isCreating }] = useCreate();
+  const [create] = useCreate();
+  const [isCreating, setIsCreating] = useState(false);
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [newRecord, setNewRecord] = useState<Record<string, any>>({});
+  const [justCreatedId, setJustCreatedId] = useState<number | null>(null);
+  
+  // Lokaler State für den ausgewählten Wert - überschreibt den Parent-Wert wenn nötig
+  const [localValue, setLocalValue] = useState<number | string | null>(value ?? null);
+
+  // Synchronisiere lokalen State mit Parent-Wert, aber nicht wenn wir gerade etwas erstellt haben
+  useEffect(() => {
+    if (value !== undefined && value !== null && !justCreatedId) {
+      setLocalValue(value);
+    }
+  }, [value, justCreatedId]);
 
   const { data: options, isPending: isLoadingOptions, refetch } = useGetList(reference, {
     pagination: { page: 1, perPage: 1000 },
@@ -81,40 +95,73 @@ export function ReferenceInputWithCreate({
 
     if (missingFields.length > 0) {
       notify(
-        translate("ra.validation.required", {
-          _: `Pflichtfelder fehlen: ${missingFields.join(", ")}`,
-        }),
+        `Pflichtfelder fehlen: ${missingFields.join(", ")}`,
         { type: "error" }
       );
       return;
     }
 
-    try {
-      const result = await create(
-        reference,
-        { data: newRecord },
-        { returnPromise: true }
-      );
-
-      if (result?.data?.id) {
-        onChange(result.data.id);
-        setShowCreateForm(false);
-        setNewRecord({});
-        refetch();
-        notify(translate("ra.notification.created", { smart_count: 1 }), {
-          type: "success",
-        });
+    setIsCreating(true);
+    
+    create(
+      reference,
+      { data: newRecord },
+      {
+        onSuccess: (data) => {
+          console.log("Created record:", data);
+          const newId = data?.id;
+          if (newId) {
+            // Setze lokalen State sofort
+            setLocalValue(newId);
+            setJustCreatedId(newId);
+            
+            // Schließe das Formular
+            setShowCreateForm(false);
+            setNewRecord({});
+            
+            // Lade die Liste neu und setze dann den Parent-Wert
+            refetch().then(() => {
+              // Mehrfach onChange aufrufen um sicherzustellen dass es ankommt
+              onChange(newId);
+              // Nochmal nach kurzer Verzögerung
+              setTimeout(() => {
+                onChange(newId);
+              }, 100);
+            });
+            
+            // Setze Parent-Wert sofort
+            onChange(newId);
+            
+            notify(`${label} erfolgreich erstellt und ausgewählt`, {
+              type: "success",
+            });
+          }
+          setIsCreating(false);
+        },
+        onError: (error: any) => {
+          console.error("Create error:", error);
+          notify(error.message || translate("ra.notification.http_error"), {
+            type: "error",
+          });
+          setIsCreating(false);
+        },
       }
-    } catch (error: any) {
-      notify(error.message || translate("ra.notification.http_error"), {
-        type: "error",
-      });
-    }
-  }, [newRecord, createFields, create, reference, onChange, refetch, notify, translate]);
+    );
+  }, [newRecord, createFields, create, reference, onChange, refetch, notify, translate, label]);
 
   const handleFieldChange = useCallback((field: string, fieldValue: any) => {
     setNewRecord((prev) => ({ ...prev, [field]: fieldValue }));
   }, []);
+
+  const handleSelectChange = useCallback((v: string) => {
+    const newValue = v === EMPTY_VALUE ? null : parseInt(v);
+    setLocalValue(newValue);
+    setJustCreatedId(null);
+    onChange(newValue);
+  }, [onChange]);
+
+  // Verwende lokalen Wert für die Anzeige
+  const displayValue = localValue ?? justCreatedId;
 
   return (
     <div className={cn("space-y-2", className)}>
@@ -122,18 +169,23 @@ export function ReferenceInputWithCreate({
       
       <div className="flex gap-2">
         <Select
-          value={value?.toString() || ""}
-          onValueChange={(v) => onChange(v ? parseInt(v) : null)}
+          value={displayValue?.toString() || EMPTY_VALUE}
+          onValueChange={handleSelectChange}
           disabled={isLoadingOptions}
         >
           <SelectTrigger className="flex-1">
             <SelectValue placeholder={translate("ra.action.select", { _: "Auswählen..." })} />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="">-</SelectItem>
+            <SelectItem value={EMPTY_VALUE}>-</SelectItem>
             {options?.map((option) => (
               <SelectItem key={option.id} value={option.id.toString()}>
-                {getOptionLabel(option)}
+                <span className="flex items-center gap-2">
+                  {getOptionLabel(option)}
+                  {option.id === justCreatedId && (
+                    <Check className="h-3 w-3 text-green-500" />
+                  )}
+                </span>
               </SelectItem>
             ))}
           </SelectContent>
@@ -151,10 +203,18 @@ export function ReferenceInputWithCreate({
         )}
       </div>
 
+      {/* Erfolgsanzeige */}
+      {justCreatedId && !showCreateForm && (
+        <p className="text-xs text-green-600 flex items-center gap-1">
+          <Check className="h-3 w-3" />
+          Neu erstellt und ausgewählt
+        </p>
+      )}
+
       {/* Nested Create Form */}
       {showCreateForm && (
-        <Card className="p-4 mt-2 border-dashed">
-          <div className="flex items-center justify-between cursor-pointer mb-3">
+        <Card className="p-4 mt-2 border-dashed border-2 border-primary/30 bg-primary/5">
+          <div className="flex items-center justify-between mb-3">
             <h4 className="text-sm font-medium">
               {createTitle || translate("ra.action.create", { _: "Neu erstellen" })}
             </h4>
@@ -169,13 +229,14 @@ export function ReferenceInputWithCreate({
                 </Label>
                 {field.type === "select" && field.options ? (
                   <Select
-                    value={newRecord[field.source]?.toString() || ""}
-                    onValueChange={(v) => handleFieldChange(field.source, v)}
+                    value={newRecord[field.source]?.toString() || EMPTY_VALUE}
+                    onValueChange={(v) => handleFieldChange(field.source, v === EMPTY_VALUE ? null : v)}
                   >
                     <SelectTrigger className="h-8">
                       <SelectValue placeholder={field.placeholder} />
                     </SelectTrigger>
                     <SelectContent>
+                      <SelectItem value={EMPTY_VALUE}>-</SelectItem>
                       {field.options.map((opt) => (
                         <SelectItem key={opt.value} value={opt.value}>
                           {opt.label}
@@ -209,7 +270,7 @@ export function ReferenceInputWithCreate({
               </div>
             ))}
 
-            <div className="flex justify-end gap-2 pt-2">
+            <div className="flex justify-end gap-2 pt-2 border-t mt-3">
               <Button
                 type="button"
                 variant="ghost"
@@ -218,6 +279,7 @@ export function ReferenceInputWithCreate({
                   setShowCreateForm(false);
                   setNewRecord({});
                 }}
+                disabled={isCreating}
               >
                 {translate("ra.action.cancel")}
               </Button>
@@ -227,7 +289,8 @@ export function ReferenceInputWithCreate({
                 onClick={handleCreateNew}
                 disabled={isCreating}
               >
-                {translate("ra.action.create")}
+                {isCreating && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                {isCreating ? "Erstelle..." : "Erstellen & Auswählen"}
               </Button>
             </div>
           </div>

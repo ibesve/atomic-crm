@@ -13,6 +13,7 @@ import { ReferenceInputWithCreate } from "@/components/admin/reference-input-wit
 import { isLinkedinUrl } from "../misc/isLinkedInUrl";
 import { useConfigurationContext } from "../root/ConfigurationContext";
 import { Avatar } from "./Avatar";
+import { useState, useEffect, useCallback } from "react";
 
 export const ContactInputs = () => {
   const isMobile = useIsMobile();
@@ -61,9 +62,25 @@ const ContactIdentityInputs = () => {
 };
 
 const ContactPositionInputs = () => {
-  const { setValue, watch } = useFormContext();
+  const { setValue, watch, getValues } = useFormContext();
   const { companySectors } = useConfigurationContext();
-  const companyId = watch("company_id");
+  
+  // Verwende getValues für den initialen Wert, nicht watch
+  const [companyId, setCompanyId] = useState<number | null>(() => getValues("company_id") ?? null);
+
+  // Synchronisiere mit dem Formular wenn sich der Wert extern ändert
+  const watchedCompanyId = watch("company_id");
+  useEffect(() => {
+    if (watchedCompanyId !== undefined && watchedCompanyId !== companyId) {
+      setCompanyId(watchedCompanyId);
+    }
+  }, [watchedCompanyId]);
+
+  const handleCompanyChange = useCallback((value: number | string | null) => {
+    console.log("Company changed to:", value);
+    setCompanyId(value as number | null);
+    setValue("company_id", value, { shouldDirty: true, shouldValidate: true, shouldTouch: true });
+  }, [setValue]);
 
   return (
     <div className="flex flex-col gap-4">
@@ -77,7 +94,7 @@ const ContactPositionInputs = () => {
         label="Unternehmen"
         optionText="name"
         value={companyId}
-        onChange={(value) => setValue("company_id", value)}
+        onChange={handleCompanyChange}
         createTitle="Neues Unternehmen erstellen"
         createFields={[
           {
@@ -251,7 +268,7 @@ const ContactMiscInputs = () => {
         label="Kundenbetreuer"
         optionText={(record) => `${record.first_name} ${record.last_name}`}
         value={salesId}
-        onChange={(value) => setValue("sales_id", value)}
+        onChange={(value) => setValue("sales_id", value, { shouldDirty: true, shouldValidate: true })}
         createTitle="Neuen Benutzer erstellen"
         allowCreate={false} // Benutzer sollten über die Benutzerverwaltung erstellt werden
         createFields={[
