@@ -1,5 +1,5 @@
-import { Import, Settings, User } from "lucide-react";
-import { CanAccess, useUserMenu } from "ra-core";
+import { Import, Settings, Shield, User } from "lucide-react";
+import { CanAccess, useGetIdentity, useTranslate, useUserMenu } from "ra-core";
 import { Link, matchPath, useLocation } from "react-router";
 import { RefreshButton } from "@/components/admin/refresh-button";
 import { ThemeModeToggle } from "@/components/admin/theme-mode-toggle";
@@ -12,10 +12,13 @@ import { ImportPage } from "../misc/ImportPage";
 const Header = () => {
   const { darkModeLogo, lightModeLogo, title } = useConfigurationContext();
   const location = useLocation();
+  const translate = useTranslate();
 
   let currentPath: string | boolean = "/";
   if (matchPath("/", location.pathname)) {
     currentPath = "/";
+  } else if (matchPath("/contacts-quickview", location.pathname)) {
+    currentPath = "/contacts-quickview";
   } else if (matchPath("/contacts/*", location.pathname)) {
     currentPath = "/contacts";
   } else if (matchPath("/companies/*", location.pathname)) {
@@ -51,22 +54,27 @@ const Header = () => {
               <div>
                 <nav className="flex">
                   <NavigationTab
-                    label="Dashboard"
+                    label={translate("crm.dashboard")}
                     to="/"
                     isActive={currentPath === "/"}
                   />
                   <NavigationTab
-                    label="Contacts"
+                    label={translate("crm.contacts")}
                     to="/contacts"
                     isActive={currentPath === "/contacts"}
                   />
                   <NavigationTab
-                    label="Companies"
+                    label={translate("crm.contacts_quickview", { _: "Kontakte (Quickview)" })}
+                    to="/contacts-quickview"
+                    isActive={currentPath === "/contacts-quickview"}
+                  />
+                  <NavigationTab
+                    label={translate("crm.companies")}
                     to="/companies"
                     isActive={currentPath === "/companies"}
                   />
                   <NavigationTab
-                    label="Deals"
+                    label={translate("crm.deals")}
                     to="/deals"
                     isActive={currentPath === "/deals"}
                   />
@@ -80,6 +88,7 @@ const Header = () => {
                   <CanAccess resource="sales" action="list">
                     <UsersMenu />
                   </CanAccess>
+                  <RBACMenu />
                   <ImportFromJsonMenuItem />
                 </UserMenu>
               </div>
@@ -114,13 +123,14 @@ const NavigationTab = ({
 
 const UsersMenu = () => {
   const userMenuContext = useUserMenu();
+  const translate = useTranslate();
   if (!userMenuContext) {
     throw new Error("<UsersMenu> must be used inside <UserMenu?");
   }
   return (
     <DropdownMenuItem asChild onClick={userMenuContext.onClose}>
       <Link to="/sales" className="flex items-center gap-2">
-        <User /> Users
+        <User /> {translate("crm.users")}
       </Link>
     </DropdownMenuItem>
   );
@@ -128,6 +138,7 @@ const UsersMenu = () => {
 
 const ConfigurationMenu = () => {
   const userMenuContext = useUserMenu();
+  const translate = useTranslate();
   if (!userMenuContext) {
     throw new Error("<ConfigurationMenu> must be used inside <UserMenu?");
   }
@@ -135,7 +146,7 @@ const ConfigurationMenu = () => {
     <DropdownMenuItem asChild onClick={userMenuContext.onClose}>
       <Link to="/settings" className="flex items-center gap-2">
         <Settings />
-        My info
+        {translate("crm.my_info")}
       </Link>
     </DropdownMenuItem>
   );
@@ -143,15 +154,41 @@ const ConfigurationMenu = () => {
 
 const ImportFromJsonMenuItem = () => {
   const userMenuContext = useUserMenu();
+  const translate = useTranslate();
   if (!userMenuContext) {
     throw new Error("<ImportFromJsonMenuItem> must be used inside <UserMenu>");
   }
   return (
     <DropdownMenuItem asChild onClick={userMenuContext.onClose}>
       <Link to={ImportPage.path} className="flex items-center gap-2">
-        <Import /> Import data
+        <Import /> {translate("crm.import_data")}
       </Link>
     </DropdownMenuItem>
   );
 };
+
+const RBACMenu = () => {
+  const userMenuContext = useUserMenu();
+  const translate = useTranslate();
+  const { identity } = useGetIdentity();
+  
+  if (!userMenuContext) {
+    return null;
+  }
+
+  // Nur für Administratoren anzeigen
+  if (!identity?.administrator) {
+    return null;
+  }
+  
+  return (
+    <DropdownMenuItem asChild onClick={userMenuContext.onClose}>
+      <Link to="/admin/rbac" className="flex items-center gap-2">
+        <Shield className="w-4 h-4" />
+        {translate("crm.rbac.title")}
+      </Link>
+    </DropdownMenuItem>
+  );
+};
+
 export default Header;

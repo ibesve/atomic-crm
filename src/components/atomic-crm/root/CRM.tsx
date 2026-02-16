@@ -32,6 +32,8 @@ import {
 } from "../providers/supabase";
 import sales from "../sales";
 import { SettingsPage } from "../settings/SettingsPage";
+import { RBACAdminPage } from "../rbac/RBACAdminPage";
+import { ContactDataGrid } from "../contacts/ContactDataGrid";
 import type { ConfigurationContextValue } from "./ConfigurationContext";
 import { ConfigurationProvider } from "./ConfigurationContext";
 import {
@@ -183,10 +185,11 @@ const DesktopAdmin = (props: CoreAdminProps) => {
         />
         <Route path={OAuthConsentPage.path} element={<OAuthConsentPage />} />
       </CustomRoutes>
-
       <CustomRoutes>
         <Route path={SettingsPage.path} element={<SettingsPage />} />
         <Route path={ImportPage.path} element={<ImportPage />} />
+        <Route path={RBACAdminPage.path} element={<RBACAdminPage />} />
+        <Route path="/contacts-quickview" element={<ContactDataGrid />} />
       </CustomRoutes>
       <Resource name="deals" {...deals} />
       <Resource name="contacts" {...contacts} />
@@ -196,6 +199,10 @@ const DesktopAdmin = (props: CoreAdminProps) => {
       <Resource name="tasks" />
       <Resource name="sales" {...sales} />
       <Resource name="tags" />
+      <Resource name="roles" />
+      <Resource name="role_permissions" />
+      <Resource name="teams" />
+      <Resource name="team_members" />
     </Admin>
   );
 };
