@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useTranslate, useGetIdentity } from "ra-core";
+import { useTranslate } from "ra-core";
 import {
   History,
   User,
@@ -86,7 +86,6 @@ export function AuditLogViewer({
   className,
 }: AuditLogViewerProps) {
   const translate = useTranslate();
-  const { identity } = useGetIdentity();
   const [actionFilter, setActionFilter] = useState<AuditAction | "all">("all");
   const [expandedItems, setExpandedItems] = useState<Set<number>>(new Set());
 

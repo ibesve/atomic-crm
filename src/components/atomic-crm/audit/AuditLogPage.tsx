@@ -1,5 +1,5 @@
 import { useTranslate } from "ra-core";
-import { History, Shield } from "lucide-react";
+import { Shield } from "lucide-react";
 import { AuditLogViewer } from "@/components/atomic-crm/audit/AuditLogViewer";
 
 export function AuditLogPage() {

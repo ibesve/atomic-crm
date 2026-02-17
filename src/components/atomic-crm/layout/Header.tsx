@@ -1,4 +1,4 @@
-import { Import, Settings, Shield, User, History } from "lucide-react";
+import { Import, Settings, User } from "lucide-react";
 import { CanAccess, useGetIdentity, useTranslate, useUserMenu } from "ra-core";
 import { Link, matchPath, useLocation } from "react-router";
 import { RefreshButton } from "@/components/admin/refresh-button";
@@ -88,8 +88,7 @@ const Header = () => {
                   <CanAccess resource="sales" action="list">
                     <UsersMenu />
                   </CanAccess>
-                  <RBACMenu />
-                  <AuditLogMenu />
+                  <AdminSettingsMenu />
                   <ImportFromJsonMenuItem />
                 </UserMenu>
               </div>
@@ -168,7 +167,7 @@ const ImportFromJsonMenuItem = () => {
   );
 };
 
-const RBACMenu = () => {
+const AdminSettingsMenu = () => {
   const userMenuContext = useUserMenu();
   const translate = useTranslate();
   const { identity } = useGetIdentity();
@@ -184,32 +183,9 @@ const RBACMenu = () => {
   
   return (
     <DropdownMenuItem asChild onClick={userMenuContext.onClose}>
-      <Link to="/admin/rbac" className="flex items-center gap-2">
-        <Shield className="w-4 h-4" />
-        {translate("crm.rbac.title")}
-      </Link>
-    </DropdownMenuItem>
-  );
-};
-
-const AuditLogMenu = () => {
-  const userMenuContext = useUserMenu();
-  const translate = useTranslate();
-  const { identity } = useGetIdentity();
-  
-  if (!userMenuContext) {
-    return null;
-  }
-  // Nur für Administratoren anzeigen
-  if (!identity?.administrator) {
-    return null;
-  }
-  
-  return (
-    <DropdownMenuItem asChild onClick={userMenuContext.onClose}>
-      <Link to="/admin/audit-log" className="flex items-center gap-2">
-        <History className="w-4 h-4" />
-        {translate("crm.audit_log.title", { _: "Änderungsprotokoll" })}
+      <Link to="/admin/settings" className="flex items-center gap-2">
+        <Settings className="w-4 h-4" />
+        {translate("crm.admin.title", { _: "Administration" })}
       </Link>
     </DropdownMenuItem>
   );

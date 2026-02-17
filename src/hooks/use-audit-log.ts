@@ -1,5 +1,5 @@
 import { useCallback } from "react";
-import { useGetList, useDataProvider, useNotify, useTranslate } from "ra-core";
+import { useGetList, useDataProvider } from "ra-core";
 
 export type AuditAction = 
   | "create" 
@@ -68,8 +68,6 @@ export function useAuditLog(options: UseAuditLogOptions = {}) {
 
 export function useCreateAuditLog() {
   const dataProvider = useDataProvider();
-  const notify = useNotify();
-  const translate = useTranslate();
 
   const createAuditLog = useCallback(
     async (params: {

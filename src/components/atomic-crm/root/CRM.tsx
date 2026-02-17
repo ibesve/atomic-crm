@@ -22,14 +22,13 @@ const Dashboard = lazy(() => import("../dashboard/Dashboard").then(m => ({ defau
 const MobileDashboard = lazy(() => import("../dashboard/MobileDashboard").then(m => ({ default: m.MobileDashboard })));
 const SettingsPage = lazy(() => import("../settings/SettingsPage").then(m => ({ default: m.SettingsPage })));
 const ImportPage = lazy(() => import("../misc/ImportPage").then(m => ({ default: m.ImportPage })));
-const RBACAdminPage = lazy(() => import("../rbac/RBACAdminPage").then(m => ({ default: m.RBACAdminPage })));
 const ContactDataGrid = lazy(() => import("../contacts/ContactDataGrid").then(m => ({ default: m.ContactDataGrid })));
 const ContactShow = lazy(() => import("../contacts/ContactShow").then(m => ({ default: m.ContactShow })));
 const CompanyShow = lazy(() => import("../companies/CompanyShow").then(m => ({ default: m.CompanyShow })));
 const NoteShowPage = lazy(() => import("../notes/NoteShowPage").then(m => ({ default: m.NoteShowPage })));
 const MobileTasksList = lazy(() => import("../tasks/MobileTasksList").then(m => ({ default: m.MobileTasksList })));
 const ContactListMobile = lazy(() => import("../contacts/ContactList").then(m => ({ default: m.ContactListMobile })));
-const AuditLogPage = lazy(() => import("../audit/AuditLogPage").then(m => ({ default: m.AuditLogPage })));
+const AdminSettingsPage = lazy(() => import("../admin/AdminSettingsPage").then(m => ({ default: m.AdminSettingsPage })));
 
 import companies from "../companies";
 import contacts from "../contacts";
@@ -165,8 +164,7 @@ const DesktopAdmin = (props: CoreAdminProps) => {
       <CustomRoutes>
         <Route path="/settings" element={<SuspenseWrapper><SettingsPage /></SuspenseWrapper>} />
         <Route path="/import" element={<SuspenseWrapper><ImportPage /></SuspenseWrapper>} />
-        <Route path="/admin/rbac" element={<SuspenseWrapper><RBACAdminPage /></SuspenseWrapper>} />
-        <Route path="/admin/audit-log" element={<SuspenseWrapper><AuditLogPage /></SuspenseWrapper>} />
+        <Route path="/admin/settings" element={<SuspenseWrapper><AdminSettingsPage /></SuspenseWrapper>} />
         <Route path="/contacts-quickview" element={<SuspenseWrapper><ContactDataGrid /></SuspenseWrapper>} />
       </CustomRoutes>
       <Resource name="deals" {...deals} />
