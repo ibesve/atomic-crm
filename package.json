@@ -73,6 +73,7 @@
     "ra-supabase-core": "^3.5.2",
     "ra-supabase-language-english": "^3.5.0",
     "ra-supabase-language-french": "^3.5.0",
+    "radix-ui": "^1.4.3",
     "react": "^19.1.0",
     "react-cropper": "^2.3.3",
     "react-dom": "^19.1.0",

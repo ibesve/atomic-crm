@@ -29,6 +29,7 @@ const CompanyShow = lazy(() => import("../companies/CompanyShow").then(m => ({ d
 const NoteShowPage = lazy(() => import("../notes/NoteShowPage").then(m => ({ default: m.NoteShowPage })));
 const MobileTasksList = lazy(() => import("../tasks/MobileTasksList").then(m => ({ default: m.MobileTasksList })));
 const ContactListMobile = lazy(() => import("../contacts/ContactList").then(m => ({ default: m.ContactListMobile })));
+const AuditLogPage = lazy(() => import("../audit/AuditLogPage").then(m => ({ default: m.AuditLogPage })));
 
 import companies from "../companies";
 import contacts from "../contacts";
@@ -165,6 +166,7 @@ const DesktopAdmin = (props: CoreAdminProps) => {
         <Route path="/settings" element={<SuspenseWrapper><SettingsPage /></SuspenseWrapper>} />
         <Route path="/import" element={<SuspenseWrapper><ImportPage /></SuspenseWrapper>} />
         <Route path="/admin/rbac" element={<SuspenseWrapper><RBACAdminPage /></SuspenseWrapper>} />
+        <Route path="/admin/audit-log" element={<SuspenseWrapper><AuditLogPage /></SuspenseWrapper>} />
         <Route path="/contacts-quickview" element={<SuspenseWrapper><ContactDataGrid /></SuspenseWrapper>} />
       </CustomRoutes>
       <Resource name="deals" {...deals} />
@@ -179,6 +181,8 @@ const DesktopAdmin = (props: CoreAdminProps) => {
       <Resource name="role_permissions" />
       <Resource name="teams" />
       <Resource name="team_members" />
+      <Resource name="audit_logs" />
+      <Resource name="record_versions" />
     </Admin>
   );
 };

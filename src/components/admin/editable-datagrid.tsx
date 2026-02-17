@@ -1,7 +1,6 @@
 import { ReactNode, useState, useCallback, useEffect } from "react";
 import {
   useGetList,
-  useDelete,
   useNotify,
   useRefresh,
   useTranslate,
@@ -18,11 +17,15 @@ import {
   Filter,
   Columns,
   GripVertical,
+  RotateCcw,
+  Eye,
+  EyeOff,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Badge } from "@/components/ui/badge";
 import {
   Table,
   TableBody,
@@ -47,6 +50,7 @@ import {
 } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 import { EditableCell } from "./editable-cell";
+import { useSoftDelete } from "@/hooks/use-soft-delete";
 
 export interface EditableColumnDef<RecordType extends RaRecord = RaRecord> {
   source: string;
@@ -68,6 +72,7 @@ interface DataGridState {
   columnOrder: string[];
   hiddenColumns: string[];
   sort: { field: string; order: "ASC" | "DESC" };
+  showDeleted: boolean;
 }
 
 interface EditableDataGridProps<RecordType extends RaRecord = RaRecord> {
@@ -77,7 +82,8 @@ interface EditableDataGridProps<RecordType extends RaRecord = RaRecord> {
   onCreate?: () => void;
   bulkActions?: boolean;
   className?: string;
-  storeKey?: string; // Key für localStorage
+  storeKey?: string;
+  enableSoftDelete?: boolean;
 }
 
 export function EditableDataGrid<RecordType extends RaRecord = RaRecord>({
@@ -88,16 +94,15 @@ export function EditableDataGrid<RecordType extends RaRecord = RaRecord>({
   bulkActions = true,
   className,
   storeKey,
+  enableSoftDelete = true,
 }: EditableDataGridProps<RecordType>) {
   const translate = useTranslate();
   const notify = useNotify();
   const refresh = useRefresh();
-  const [deleteOne] = useDelete();
+  const { softDelete, restore, bulkSoftDelete, bulkRestore } = useSoftDelete(resource);
   
-  // Storage key für dieses DataGrid
   const storageKey = storeKey || `datagrid_${resource}`;
   
-  // State aus localStorage laden oder Defaults verwenden
   const loadState = useCallback((): DataGridState => {
     try {
       const saved = localStorage.getItem(storageKey);
@@ -107,6 +112,7 @@ export function EditableDataGrid<RecordType extends RaRecord = RaRecord>({
           columnOrder: parsed.columnOrder || columns.map(c => c.source),
           hiddenColumns: parsed.hiddenColumns || columns.filter(c => c.defaultHidden).map(c => c.source),
           sort: parsed.sort || defaultSort,
+          showDeleted: parsed.showDeleted || false,
         };
       }
     } catch (e) {
@@ -116,6 +122,7 @@ export function EditableDataGrid<RecordType extends RaRecord = RaRecord>({
       columnOrder: columns.map(c => c.source),
       hiddenColumns: columns.filter(c => c.defaultHidden).map(c => c.source),
       sort: defaultSort,
+      showDeleted: false,
     };
   }, [columns, defaultSort, storageKey]);
 
@@ -124,12 +131,9 @@ export function EditableDataGrid<RecordType extends RaRecord = RaRecord>({
   const [selectedIds, setSelectedIds] = useState<(string | number)[]>([]);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [recordToDelete, setRecordToDelete] = useState<RecordType | null>(null);
-  
-  // Drag & Drop State
   const [draggedColumn, setDraggedColumn] = useState<string | null>(null);
   const [dragOverColumn, setDragOverColumn] = useState<string | null>(null);
 
-  // State im localStorage speichern
   useEffect(() => {
     try {
       localStorage.setItem(storageKey, JSON.stringify(state));
@@ -138,16 +142,32 @@ export function EditableDataGrid<RecordType extends RaRecord = RaRecord>({
     }
   }, [state, storageKey]);
 
-  // Fetch data with sorting and filtering
+  // Build filter based on soft delete state
+  const buildFilter = useCallback(() => {
+    const baseFilter = Object.fromEntries(
+      Object.entries(filters).filter(([_, v]) => v !== "")
+    );
+    
+    // Wenn showDeleted false ist, nur nicht-gelöschte anzeigen
+    if (enableSoftDelete && !state.showDeleted) {
+      return { ...baseFilter, "deleted_at@is": "null" };
+    }
+    
+    return baseFilter;
+  }, [filters, state.showDeleted, enableSoftDelete]);
+
   const { data, isPending, total } = useGetList<RecordType>(resource, {
     pagination: { page: 1, perPage: 100 },
     sort: state.sort,
-    filter: Object.fromEntries(
-      Object.entries(filters).filter(([_, v]) => v !== "")
-    ),
+    filter: buildFilter(),
   });
 
-  // Fetch reference data for reference columns
+  // Count deleted items
+  const { total: deletedCount } = useGetList<RecordType>(resource, {
+    pagination: { page: 1, perPage: 1 },
+    filter: { "deleted_at@not.is": "null" },
+  });
+
   const referenceColumns = columns.filter((c) => c.type === "reference" && c.referenceResource);
   const referenceQueries = referenceColumns.map((col) => ({
     resource: col.referenceResource!,
@@ -161,7 +181,6 @@ export function EditableDataGrid<RecordType extends RaRecord = RaRecord>({
     return query?.data || [];
   };
 
-  // Toggle sort
   const handleSort = useCallback((field: string) => {
     setState((prev) => ({
       ...prev,
@@ -172,7 +191,6 @@ export function EditableDataGrid<RecordType extends RaRecord = RaRecord>({
     }));
   }, []);
 
-  // Toggle column visibility
   const toggleColumn = useCallback((source: string) => {
     setState((prev) => ({
       ...prev,
@@ -180,6 +198,11 @@ export function EditableDataGrid<RecordType extends RaRecord = RaRecord>({
         ? prev.hiddenColumns.filter((c) => c !== source)
         : [...prev.hiddenColumns, source],
     }));
+  }, []);
+
+  const toggleShowDeleted = useCallback(() => {
+    setState((prev) => ({ ...prev, showDeleted: !prev.showDeleted }));
+    setSelectedIds([]);
   }, []);
 
   // Drag & Drop Handlers
@@ -208,21 +231,18 @@ export function EditableDataGrid<RecordType extends RaRecord = RaRecord>({
       setDragOverColumn(null);
       return;
     }
-
     setState((prev) => {
       const newOrder = [...prev.columnOrder];
       const draggedIndex = newOrder.indexOf(draggedColumn);
       const targetIndex = newOrder.indexOf(targetSource);
       
       if (draggedIndex !== -1 && targetIndex !== -1) {
-        // Element entfernen und an neuer Position einfügen
         newOrder.splice(draggedIndex, 1);
         newOrder.splice(targetIndex, 0, draggedColumn);
       }
       
       return { ...prev, columnOrder: newOrder };
     });
-
     setDraggedColumn(null);
     setDragOverColumn(null);
   }, [draggedColumn]);
@@ -232,7 +252,6 @@ export function EditableDataGrid<RecordType extends RaRecord = RaRecord>({
     setDragOverColumn(null);
   }, []);
 
-  // Reset column order
   const resetColumnOrder = useCallback(() => {
     setState((prev) => ({
       ...prev,
@@ -242,7 +261,6 @@ export function EditableDataGrid<RecordType extends RaRecord = RaRecord>({
     notify(translate("ra.message.settings_reset", { _: "Einstellungen zurückgesetzt" }), { type: "info" });
   }, [columns, notify, translate]);
 
-  // Selection handlers
   const toggleSelectAll = useCallback(() => {
     if (!data) return;
     if (selectedIds.length === data.length) {
@@ -258,55 +276,57 @@ export function EditableDataGrid<RecordType extends RaRecord = RaRecord>({
     );
   }, []);
 
-  // Delete handler
+  // Delete handler - uses soft delete
   const handleDelete = useCallback(
     async (record: RecordType) => {
-      try {
-        await deleteOne(resource, { id: record.id, previousData: record });
-        notify(translate("ra.notification.deleted", { smart_count: 1 }), {
-          type: "success",
-        });
-        refresh();
-      } catch (error: any) {
-        notify(error.message || translate("ra.notification.http_error"), {
-          type: "error",
-        });
+      if (enableSoftDelete) {
+        await softDelete(record.id);
       }
       setDeleteDialogOpen(false);
       setRecordToDelete(null);
     },
-    [resource, deleteOne, notify, translate, refresh]
+    [enableSoftDelete, softDelete]
   );
 
-  // Bulk delete
-  const handleBulkDelete = useCallback(async () => {
-    if (!data) return;
-    for (const id of selectedIds) {
-      const record = data.find((r) => r.id === id);
-      if (record) {
-        await deleteOne(resource, { id, previousData: record });
-      }
-    }
-    notify(translate("ra.notification.deleted", { smart_count: selectedIds.length }), {
-      type: "success",
-    });
-    setSelectedIds([]);
-    refresh();
-  }, [data, selectedIds, resource, deleteOne, notify, translate, refresh]);
+  // Restore handler
+  const handleRestore = useCallback(
+    async (record: RecordType) => {
+      await restore(record.id);
+    },
+    [restore]
+  );
 
-  // Spalten in der richtigen Reihenfolge und nur sichtbare
+  // Bulk delete - uses soft delete
+  const handleBulkDelete = useCallback(async () => {
+    if (enableSoftDelete) {
+      await bulkSoftDelete(selectedIds);
+    }
+    setSelectedIds([]);
+    setDeleteDialogOpen(false);
+  }, [selectedIds, enableSoftDelete, bulkSoftDelete]);
+
+  // Bulk restore
+  const handleBulkRestore = useCallback(async () => {
+    await bulkRestore(selectedIds);
+    setSelectedIds([]);
+  }, [selectedIds, bulkRestore]);
+
   const orderedColumns = state.columnOrder
     .map(source => columns.find(c => c.source === source))
     .filter((col): col is EditableColumnDef<RecordType> => 
       col !== undefined && !state.hiddenColumns.includes(col.source)
     );
 
+  // Check if record is deleted
+  const isDeleted = (record: RecordType) => {
+    return enableSoftDelete && (record as any).deleted_at !== null;
+  };
+
   return (
     <Card className={cn("p-4", className)}>
       {/* Toolbar */}
       <div className="flex items-center justify-between mb-4 gap-4">
         <div className="flex items-center gap-2 flex-1">
-          {/* Quick filter */}
           <div className="relative flex-1 max-w-sm">
             <Filter className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
@@ -318,6 +338,31 @@ export function EditableDataGrid<RecordType extends RaRecord = RaRecord>({
         </div>
 
         <div className="flex items-center gap-2">
+          {/* Show deleted toggle */}
+          {enableSoftDelete && (
+            <Button
+              variant={state.showDeleted ? "secondary" : "outline"}
+              size="sm"
+              onClick={toggleShowDeleted}
+              className={cn(state.showDeleted && "border-red-300")}
+            >
+              {state.showDeleted ? (
+                <EyeOff className="h-4 w-4 mr-2" />
+              ) : (
+                <Eye className="h-4 w-4 mr-2" />
+              )}
+              {state.showDeleted 
+                ? translate("crm.soft_delete.hide_deleted", { _: "Gelöschte ausblenden" })
+                : translate("crm.soft_delete.show_deleted", { _: "Gelöschte anzeigen" })
+              }
+              {deletedCount && deletedCount > 0 && !state.showDeleted && (
+                <Badge variant="destructive" className="ml-2 h-5 px-1.5">
+                  {deletedCount}
+                </Badge>
+              )}
+            </Button>
+          )}
+
           {/* Column selector */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
@@ -351,14 +396,28 @@ export function EditableDataGrid<RecordType extends RaRecord = RaRecord>({
 
           {/* Bulk actions */}
           {bulkActions && selectedIds.length > 0 && (
-            <Button
-              variant="destructive"
-              size="sm"
-              onClick={() => setDeleteDialogOpen(true)}
-            >
-              <Trash2 className="h-4 w-4 mr-2" />
-              {translate("ra.action.delete")} ({selectedIds.length})
-            </Button>
+            <>
+              {state.showDeleted ? (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleBulkRestore}
+                  className="border-green-300 text-green-700 hover:bg-green-50"
+                >
+                  <RotateCcw className="h-4 w-4 mr-2" />
+                  {translate("crm.soft_delete.restore", { _: "Wiederherstellen" })} ({selectedIds.length})
+                </Button>
+              ) : (
+                <Button
+                  variant="destructive"
+                  size="sm"
+                  onClick={() => setDeleteDialogOpen(true)}
+                >
+                  <Trash2 className="h-4 w-4 mr-2" />
+                  {translate("ra.action.delete")} ({selectedIds.length})
+                </Button>
+              )}
+            </>
           )}
 
           {/* Create button */}
@@ -447,7 +506,11 @@ export function EditableDataGrid<RecordType extends RaRecord = RaRecord>({
             ) : (
               data.map((record) => (
                 <RecordContextProvider key={record.id} value={record}>
-                  <TableRow>
+                  <TableRow
+                    className={cn(
+                      isDeleted(record) && "opacity-50 bg-red-50/50 dark:bg-red-950/20"
+                    )}
+                  >
                     {bulkActions && (
                       <TableCell>
                         <Checkbox
@@ -458,7 +521,7 @@ export function EditableDataGrid<RecordType extends RaRecord = RaRecord>({
                       </TableCell>
                     )}
                     {orderedColumns.map((col) =>
-                      col.editable ? (
+                      col.editable && !isDeleted(record) ? (
                         <EditableCell
                           key={col.source}
                           source={col.source}
@@ -507,18 +570,33 @@ export function EditableDataGrid<RecordType extends RaRecord = RaRecord>({
                       )
                     )}
                     <TableCell>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8 text-destructive hover:text-destructive"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setRecordToDelete(record);
-                          setDeleteDialogOpen(true);
-                        }}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
+                      {isDeleted(record) ? (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 text-green-600 hover:text-green-700 hover:bg-green-50"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleRestore(record);
+                          }}
+                          title={translate("crm.soft_delete.restore", { _: "Wiederherstellen" })}
+                        >
+                          <RotateCcw className="h-4 w-4" />
+                        </Button>
+                      ) : (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 text-destructive hover:text-destructive"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setRecordToDelete(record);
+                            setDeleteDialogOpen(true);
+                          }}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      )}
                     </TableCell>
                   </TableRow>
                 </RecordContextProvider>
@@ -532,6 +610,11 @@ export function EditableDataGrid<RecordType extends RaRecord = RaRecord>({
       {total !== undefined && (
         <div className="text-sm text-muted-foreground mt-2">
           {total} {translate("ra.navigation.page_rows_per_page", { _: "Einträge" })}
+          {state.showDeleted && deletedCount && deletedCount > 0 && (
+            <span className="text-red-500 ml-2">
+              ({deletedCount} gelöscht)
+            </span>
+          )}
         </div>
       )}
 
@@ -546,10 +629,16 @@ export function EditableDataGrid<RecordType extends RaRecord = RaRecord>({
               })}
             </DialogTitle>
             <DialogDescription>
-              {translate("ra.message.delete_content", {
-                name: resource,
-                smart_count: recordToDelete ? 1 : selectedIds.length,
-              })}
+              {enableSoftDelete ? (
+                translate("crm.soft_delete.confirm_message", {
+                  _: "Der Eintrag wird in den Papierkorb verschoben und kann wiederhergestellt werden.",
+                })
+              ) : (
+                translate("ra.message.delete_content", {
+                  name: resource,
+                  smart_count: recordToDelete ? 1 : selectedIds.length,
+                })
+              )}
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>

@@ -1,0 +1,1 @@
+DROP TYPE IF EXISTS audit_action_type CASCADE;
