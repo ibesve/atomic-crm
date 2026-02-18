@@ -132,12 +132,12 @@ export function CustomFieldsManager({
   const [newOption, setNewOption] = useState("");
 
   // Filter basierend auf customObjectId oder entityType
-  const filter: Record<string, any> = { deleted_at: null };
+  const filter: Record<string, any> = { "deleted_at@is": "null" };
   if (customObjectId) {
     filter.custom_object_id = customObjectId;
   } else if (entityType) {
     filter.entity_type = entityType;
-    filter.custom_object_id = null;
+    filter["custom_object_id@is"] = "null";
   }
 
   const { data: fields, isLoading } = useGetList<CustomFieldDefinition>(

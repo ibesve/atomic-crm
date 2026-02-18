@@ -105,7 +105,7 @@ export function CustomObjectsManager() {
     {
       pagination: { page: 1, perPage: 100 },
       sort: { field: "sort_order", order: "ASC" },
-      filter: { deleted_at: null },
+      filter: { "deleted_at@is": "null" },
     }
   );
 

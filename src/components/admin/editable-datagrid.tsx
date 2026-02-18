@@ -1,8 +1,7 @@
-import { ReactNode, useState, useCallback, useEffect } from "react";
+import { ReactNode, useState, useCallback, useEffect, useMemo } from "react";
 import {
   useGetList,
   useNotify,
-  useRefresh,
   useTranslate,
   RecordContextProvider,
   RaRecord,
@@ -59,6 +58,7 @@ export interface EditableColumnDef<RecordType extends RaRecord = RaRecord> {
   type?: "text" | "number" | "select" | "reference";
   options?: { value: string; label: string }[];
   referenceResource?: string;
+  referenceData?: RaRecord[]; // NEU: Referenzdaten können direkt übergeben werden
   render?: (record: RecordType) => ReactNode;
   renderLink?: boolean;
   linkPath?: (record: RecordType) => string;
@@ -98,7 +98,6 @@ export function EditableDataGrid<RecordType extends RaRecord = RaRecord>({
 }: EditableDataGridProps<RecordType>) {
   const translate = useTranslate();
   const notify = useNotify();
-  const refresh = useRefresh();
   const { softDelete, restore, bulkSoftDelete, bulkRestore } = useSoftDelete(resource);
   
   const storageKey = storeKey || `datagrid_${resource}`;
@@ -127,6 +126,27 @@ export function EditableDataGrid<RecordType extends RaRecord = RaRecord>({
   }, [columns, defaultSort, storageKey]);
 
   const [state, setState] = useState<DataGridState>(loadState);
+  
+  // Synchronisiere columnOrder mit den aktuellen Spalten (füge neue hinzu, entferne alte)
+  useEffect(() => {
+    const currentSources = columns.map(c => c.source);
+    const hasNewColumns = currentSources.some(s => !state.columnOrder.includes(s));
+    const hasRemovedColumns = state.columnOrder.some(s => !currentSources.includes(s));
+    
+    if (hasNewColumns || hasRemovedColumns) {
+      setState(prev => {
+        // Behalte die Reihenfolge der existierenden Spalten
+        const validOrder = prev.columnOrder.filter(s => currentSources.includes(s));
+        // Füge neue Spalten am Ende hinzu
+        const newSources = currentSources.filter(s => !prev.columnOrder.includes(s));
+        return {
+          ...prev,
+          columnOrder: [...validOrder, ...newSources],
+        };
+      });
+    }
+  }, [columns, state.columnOrder]);
+
   const [filters, setFilters] = useState<Record<string, string>>({});
   const [selectedIds, setSelectedIds] = useState<(string | number)[]>([]);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
@@ -168,18 +188,14 @@ export function EditableDataGrid<RecordType extends RaRecord = RaRecord>({
     filter: { "deleted_at@not.is": "null" },
   });
 
-  const referenceColumns = columns.filter((c) => c.type === "reference" && c.referenceResource);
-  const referenceQueries = referenceColumns.map((col) => ({
-    resource: col.referenceResource!,
-    ...useGetList(col.referenceResource!, {
-      pagination: { page: 1, perPage: 1000 },
-    }),
-  }));
-
-  const getReferenceData = (referenceResource: string) => {
-    const query = referenceQueries.find((q) => q.resource === referenceResource);
-    return query?.data || [];
-  };
+  // Referenzdaten direkt aus den Column-Definitionen holen (keine Hooks mehr in der map!)
+  const getReferenceData = useCallback((col: EditableColumnDef<RecordType>) => {
+    // Wenn referenceData direkt in der Column-Definition übergeben wurde, nutze diese
+    if (col.referenceData) {
+      return col.referenceData;
+    }
+    return [];
+  }, []);
 
   const handleSort = useCallback((field: string) => {
     setState((prev) => ({
@@ -311,11 +327,21 @@ export function EditableDataGrid<RecordType extends RaRecord = RaRecord>({
     setSelectedIds([]);
   }, [selectedIds, bulkRestore]);
 
-  const orderedColumns = state.columnOrder
-    .map(source => columns.find(c => c.source === source))
-    .filter((col): col is EditableColumnDef<RecordType> => 
-      col !== undefined && !state.hiddenColumns.includes(col.source)
+  const orderedColumns = useMemo(() => {
+    // Erst die Spalten aus columnOrder holen, die auch in columns existieren
+    const orderedFromState = state.columnOrder
+      .map(source => columns.find(c => c.source === source))
+      .filter((col): col is EditableColumnDef<RecordType> => col !== undefined);
+    
+    // Dann neue Spalten hinzufügen, die noch nicht in columnOrder sind
+    const newColumns = columns.filter(
+      col => !state.columnOrder.includes(col.source)
     );
+    
+    // Kombinieren und versteckte Spalten herausfiltern
+    return [...orderedFromState, ...newColumns]
+      .filter(col => !state.hiddenColumns.includes(col.source));
+  }, [state.columnOrder, state.hiddenColumns, columns]);
 
   // Check if record is deleted
   const isDeleted = (record: RecordType) => {
@@ -528,11 +554,7 @@ export function EditableDataGrid<RecordType extends RaRecord = RaRecord>({
                           resource={resource}
                           type={col.type}
                           options={col.options}
-                          referenceData={
-                            col.referenceResource
-                              ? getReferenceData(col.referenceResource)
-                              : undefined
-                          }
+                          referenceData={getReferenceData(col)}
                           renderDisplay={
                             col.render
                               ? (_, r) => col.render!(r as RecordType)

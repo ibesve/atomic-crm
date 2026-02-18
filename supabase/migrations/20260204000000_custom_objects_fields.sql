@@ -35,8 +35,8 @@ CREATE TABLE IF NOT EXISTS public.custom_object_definitions (
 
 ALTER TABLE public.custom_object_definitions ENABLE ROW LEVEL SECURITY;
 
-CREATE INDEX idx_custom_object_definitions_name ON public.custom_object_definitions(name);
-CREATE INDEX idx_custom_object_definitions_active ON public.custom_object_definitions(is_active) WHERE deleted_at IS NULL;
+CREATE INDEX IF NOT EXISTS idx_custom_object_definitions_name ON public.custom_object_definitions(name);
+CREATE INDEX IF NOT EXISTS idx_custom_object_definitions_active ON public.custom_object_definitions(is_active) WHERE deleted_at IS NULL;
 
 -- =====================================================
 -- 2. CUSTOM FIELD DEFINITIONS (Feld-Definitionen)
@@ -86,8 +86,7 @@ CREATE TABLE IF NOT EXISTS public.custom_field_definitions (
   -- Soft Delete
   deleted_at timestamptz,
   
-  CONSTRAINT custom_field_unique_per_object UNIQUE (custom_object_id, name) WHERE entity_type IS NULL,
-  CONSTRAINT custom_field_unique_per_entity UNIQUE (entity_type, name) WHERE custom_object_id IS NULL,
+  -- Feldtyp-Validierung
   CONSTRAINT custom_field_type_check CHECK (
     field_type IN ('text', 'number', 'date', 'datetime', 'boolean', 'select', 'multiselect', 'reference', 'email', 'phone', 'url', 'textarea', 'currency', 'percent', 'rating')
   )
@@ -95,8 +94,17 @@ CREATE TABLE IF NOT EXISTS public.custom_field_definitions (
 
 ALTER TABLE public.custom_field_definitions ENABLE ROW LEVEL SECURITY;
 
-CREATE INDEX idx_custom_field_definitions_object ON public.custom_field_definitions(custom_object_id) WHERE deleted_at IS NULL;
-CREATE INDEX idx_custom_field_definitions_entity ON public.custom_field_definitions(entity_type) WHERE deleted_at IS NULL;
+-- Partielle Unique-Indizes statt Constraints mit WHERE
+CREATE UNIQUE INDEX IF NOT EXISTS idx_custom_field_unique_per_object 
+  ON public.custom_field_definitions(custom_object_id, name) 
+  WHERE entity_type IS NULL AND deleted_at IS NULL;
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_custom_field_unique_per_entity 
+  ON public.custom_field_definitions(entity_type, name) 
+  WHERE custom_object_id IS NULL AND deleted_at IS NULL;
+
+CREATE INDEX IF NOT EXISTS idx_custom_field_definitions_object ON public.custom_field_definitions(custom_object_id) WHERE deleted_at IS NULL;
+CREATE INDEX IF NOT EXISTS idx_custom_field_definitions_entity ON public.custom_field_definitions(entity_type) WHERE deleted_at IS NULL;
 
 -- =====================================================
 -- 3. CUSTOM OBJECT DATA (Datenspeicher für Custom Objects)
@@ -122,9 +130,9 @@ CREATE TABLE IF NOT EXISTS public.custom_object_data (
 
 ALTER TABLE public.custom_object_data ENABLE ROW LEVEL SECURITY;
 
-CREATE INDEX idx_custom_object_data_definition ON public.custom_object_data(object_definition_id) WHERE deleted_at IS NULL;
-CREATE INDEX idx_custom_object_data_sales ON public.custom_object_data(sales_id);
-CREATE INDEX idx_custom_object_data_jsonb ON public.custom_object_data USING GIN (data);
+CREATE INDEX IF NOT EXISTS idx_custom_object_data_definition ON public.custom_object_data(object_definition_id) WHERE deleted_at IS NULL;
+CREATE INDEX IF NOT EXISTS idx_custom_object_data_sales ON public.custom_object_data(sales_id);
+CREATE INDEX IF NOT EXISTS idx_custom_object_data_jsonb ON public.custom_object_data USING GIN (data);
 
 -- =====================================================
 -- 4. CUSTOM FIELD VALUES (Werte für Custom Fields auf Standard-Entities)
@@ -153,15 +161,15 @@ CREATE TABLE IF NOT EXISTS public.custom_field_values (
 
 ALTER TABLE public.custom_field_values ENABLE ROW LEVEL SECURITY;
 
-CREATE INDEX idx_custom_field_values_field ON public.custom_field_values(field_definition_id);
-CREATE INDEX idx_custom_field_values_contact ON public.custom_field_values(contact_id) WHERE contact_id IS NOT NULL;
-CREATE INDEX idx_custom_field_values_company ON public.custom_field_values(company_id) WHERE company_id IS NOT NULL;
-CREATE INDEX idx_custom_field_values_deal ON public.custom_field_values(deal_id) WHERE deal_id IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_custom_field_values_field ON public.custom_field_values(field_definition_id);
+CREATE INDEX IF NOT EXISTS idx_custom_field_values_contact ON public.custom_field_values(contact_id) WHERE contact_id IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_custom_field_values_company ON public.custom_field_values(company_id) WHERE company_id IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_custom_field_values_deal ON public.custom_field_values(deal_id) WHERE deal_id IS NOT NULL;
 
 -- Unique constraint: Ein Feld pro Entity
-CREATE UNIQUE INDEX idx_custom_field_values_unique_contact ON public.custom_field_values(field_definition_id, contact_id) WHERE contact_id IS NOT NULL;
-CREATE UNIQUE INDEX idx_custom_field_values_unique_company ON public.custom_field_values(field_definition_id, company_id) WHERE company_id IS NOT NULL;
-CREATE UNIQUE INDEX idx_custom_field_values_unique_deal ON public.custom_field_values(field_definition_id, deal_id) WHERE deal_id IS NOT NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS idx_custom_field_values_unique_contact ON public.custom_field_values(field_definition_id, contact_id) WHERE contact_id IS NOT NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS idx_custom_field_values_unique_company ON public.custom_field_values(field_definition_id, company_id) WHERE company_id IS NOT NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS idx_custom_field_values_unique_deal ON public.custom_field_values(field_definition_id, deal_id) WHERE deal_id IS NOT NULL;
 
 -- =====================================================
 -- 5. OBJECT RELATIONSHIPS (M:N Verknüpfungen)
@@ -190,32 +198,37 @@ CREATE TABLE IF NOT EXISTS public.object_relationships (
 
 ALTER TABLE public.object_relationships ENABLE ROW LEVEL SECURITY;
 
-CREATE INDEX idx_object_relationships_source ON public.object_relationships(source_type, source_id);
-CREATE INDEX idx_object_relationships_target ON public.object_relationships(target_type, target_id);
+CREATE INDEX IF NOT EXISTS idx_object_relationships_source ON public.object_relationships(source_type, source_id);
+CREATE INDEX IF NOT EXISTS idx_object_relationships_target ON public.object_relationships(target_type, target_id);
 
 -- =====================================================
 -- 6. RLS POLICIES
 -- =====================================================
 
 -- Custom Object Definitions: Lesen für alle, Schreiben nur für Admins
+DROP POLICY IF EXISTS "Custom object definitions read for authenticated" ON public.custom_object_definitions;
 CREATE POLICY "Custom object definitions read for authenticated" ON public.custom_object_definitions
   FOR SELECT TO authenticated USING (true);
 
+DROP POLICY IF EXISTS "Custom object definitions write for admins" ON public.custom_object_definitions;
 CREATE POLICY "Custom object definitions write for admins" ON public.custom_object_definitions
   FOR ALL TO authenticated
   USING (public.is_admin())
   WITH CHECK (public.is_admin());
 
 -- Custom Field Definitions: Lesen für alle, Schreiben nur für Admins
+DROP POLICY IF EXISTS "Custom field definitions read for authenticated" ON public.custom_field_definitions;
 CREATE POLICY "Custom field definitions read for authenticated" ON public.custom_field_definitions
   FOR SELECT TO authenticated USING (true);
 
+DROP POLICY IF EXISTS "Custom field definitions write for admins" ON public.custom_field_definitions;
 CREATE POLICY "Custom field definitions write for admins" ON public.custom_field_definitions
   FOR ALL TO authenticated
   USING (public.is_admin())
   WITH CHECK (public.is_admin());
 
 -- Custom Object Data: RBAC-basiert
+DROP POLICY IF EXISTS "Custom object data read with RBAC" ON public.custom_object_data;
 CREATE POLICY "Custom object data read with RBAC" ON public.custom_object_data
   FOR SELECT TO authenticated
   USING (
@@ -223,6 +236,7 @@ CREATE POLICY "Custom object data read with RBAC" ON public.custom_object_data
     OR public.has_record_access('custom_objects', 'list', sales_id)
   );
 
+DROP POLICY IF EXISTS "Custom object data insert with RBAC" ON public.custom_object_data;
 CREATE POLICY "Custom object data insert with RBAC" ON public.custom_object_data
   FOR INSERT TO authenticated
   WITH CHECK (
@@ -230,6 +244,7 @@ CREATE POLICY "Custom object data insert with RBAC" ON public.custom_object_data
     OR public.check_permission('custom_objects', 'create') IN ('all', 'own', 'team')
   );
 
+DROP POLICY IF EXISTS "Custom object data update with RBAC" ON public.custom_object_data;
 CREATE POLICY "Custom object data update with RBAC" ON public.custom_object_data
   FOR UPDATE TO authenticated
   USING (
@@ -237,6 +252,7 @@ CREATE POLICY "Custom object data update with RBAC" ON public.custom_object_data
     OR public.has_record_access('custom_objects', 'edit', sales_id)
   );
 
+DROP POLICY IF EXISTS "Custom object data delete with RBAC" ON public.custom_object_data;
 CREATE POLICY "Custom object data delete with RBAC" ON public.custom_object_data
   FOR DELETE TO authenticated
   USING (
@@ -245,16 +261,20 @@ CREATE POLICY "Custom object data delete with RBAC" ON public.custom_object_data
   );
 
 -- Custom Field Values: Basierend auf Entity-Zugriff
+DROP POLICY IF EXISTS "Custom field values read for authenticated" ON public.custom_field_values;
 CREATE POLICY "Custom field values read for authenticated" ON public.custom_field_values
   FOR SELECT TO authenticated USING (true);
 
+DROP POLICY IF EXISTS "Custom field values write for authenticated" ON public.custom_field_values;
 CREATE POLICY "Custom field values write for authenticated" ON public.custom_field_values
   FOR ALL TO authenticated USING (true) WITH CHECK (true);
 
 -- Object Relationships: Für alle authentifizierten Benutzer
+DROP POLICY IF EXISTS "Object relationships read for authenticated" ON public.object_relationships;
 CREATE POLICY "Object relationships read for authenticated" ON public.object_relationships
   FOR SELECT TO authenticated USING (true);
 
+DROP POLICY IF EXISTS "Object relationships write for authenticated" ON public.object_relationships;
 CREATE POLICY "Object relationships write for authenticated" ON public.object_relationships
   FOR ALL TO authenticated USING (true) WITH CHECK (true);
 
@@ -335,17 +355,17 @@ BEGIN
   IF p_entity_type = 'contacts' THEN
     INSERT INTO public.custom_field_values (field_definition_id, contact_id, value)
     VALUES (v_field_id, p_entity_id, p_value)
-    ON CONFLICT (field_definition_id, contact_id) 
+    ON CONFLICT (field_definition_id, contact_id) WHERE contact_id IS NOT NULL
     DO UPDATE SET value = p_value, updated_at = NOW();
   ELSIF p_entity_type = 'companies' THEN
     INSERT INTO public.custom_field_values (field_definition_id, company_id, value)
     VALUES (v_field_id, p_entity_id, p_value)
-    ON CONFLICT (field_definition_id, company_id) 
+    ON CONFLICT (field_definition_id, company_id) WHERE company_id IS NOT NULL
     DO UPDATE SET value = p_value, updated_at = NOW();
   ELSIF p_entity_type = 'deals' THEN
     INSERT INTO public.custom_field_values (field_definition_id, deal_id, value)
     VALUES (v_field_id, p_entity_id, p_value)
-    ON CONFLICT (field_definition_id, deal_id) 
+    ON CONFLICT (field_definition_id, deal_id) WHERE deal_id IS NOT NULL
     DO UPDATE SET value = p_value, updated_at = NOW();
   ELSE
     RETURN false;

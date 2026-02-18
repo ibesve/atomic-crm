@@ -40,6 +40,10 @@
           "type": "registry:component"
         },
         {
+          "path": "src/components/atomic-crm/types/custom-objects.ts",
+          "type": "registry:component"
+        },
+        {
           "path": "src/components/atomic-crm/tasks/taskFilters.ts",
           "type": "registry:component"
         },
@@ -172,6 +176,10 @@
           "type": "registry:component"
         },
         {
+          "path": "src/components/atomic-crm/rbac/UserAttributesManager.tsx",
+          "type": "registry:component"
+        },
+        {
           "path": "src/components/atomic-crm/rbac/TeamManager.tsx",
           "type": "registry:component"
         },
@@ -185,6 +193,14 @@
         },
         {
           "path": "src/components/atomic-crm/rbac/RBACAdminPage.tsx",
+          "type": "registry:component"
+        },
+        {
+          "path": "src/components/atomic-crm/rbac/PermissionConditionsManager.tsx",
+          "type": "registry:component"
+        },
+        {
+          "path": "src/components/atomic-crm/rbac/AttributeDefinitionsManager.tsx",
           "type": "registry:component"
         },
         {
@@ -640,6 +656,18 @@
           "type": "registry:component"
         },
         {
+          "path": "src/components/atomic-crm/custom-objects/index.ts",
+          "type": "registry:component"
+        },
+        {
+          "path": "src/components/atomic-crm/custom-objects/CustomObjectsManager.tsx",
+          "type": "registry:component"
+        },
+        {
+          "path": "src/components/atomic-crm/custom-objects/CustomFieldsManager.tsx",
+          "type": "registry:component"
+        },
+        {
           "path": "src/components/atomic-crm/contacts/useContactImport.tsx",
           "type": "registry:component"
         },
@@ -797,6 +825,10 @@
         },
         {
           "path": "src/components/atomic-crm/audit/AuditLogPage.tsx",
+          "type": "registry:component"
+        },
+        {
+          "path": "src/components/atomic-crm/admin/AdminSettingsPage.tsx",
           "type": "registry:component"
         },
         {
