@@ -56,9 +56,6 @@ export default defineConfig({
   build: {
     sourcemap: true,
   },
-  server: {
-    allowedHosts: ["hubio-crm.fuchs-soehne.de"],
-  },
   resolve: {
     preserveSymlinks: true,
     alias: {
