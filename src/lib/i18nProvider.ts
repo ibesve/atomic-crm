@@ -1,4 +1,4 @@
-import defaultMessages from "ra-language-english";
+import germanMessages from "ra-language-german";
 import polyglotI18nProvider from "ra-i18n-polyglot";
 import type { TranslationMessages } from "ra-core";
 
@@ -14,15 +14,8 @@ const guesserMessages = {
 };
 
 export const i18nProvider = polyglotI18nProvider(
-  () =>
-    ({
-      ...defaultMessages,
-      ra: {
-        ...defaultMessages.ra,
-        ...guesserMessages,
-      },
-    }) as TranslationMessages,
-  "en",
-  [{ name: "en", value: "English" }],
+  () => germanMessages,
+  "de",
+  [{ name: "de", value: "Deutsch" }],
   { allowMissing: true },
 );
