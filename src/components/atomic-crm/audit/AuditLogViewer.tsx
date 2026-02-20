@@ -67,16 +67,16 @@ const ACTION_COLORS: Record<AuditAction, string> = {
   bulk_update: "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200",
 };
 
-const ACTION_LABELS: Record<AuditAction, string> = {
-  create: "Erstellt",
-  update: "Aktualisiert",
-  delete: "Gelöscht",
-  restore: "Wiederhergestellt",
-  export: "Exportiert",
-  import: "Importiert",
-  merge: "Zusammengeführt",
-  bulk_delete: "Mehrfach gelöscht",
-  bulk_update: "Mehrfach aktualisiert",
+const ACTION_LABEL_KEYS: Record<AuditAction, string> = {
+  create: "crm.audit_log.action_create",
+  update: "crm.audit_log.action_update",
+  delete: "crm.audit_log.action_delete",
+  restore: "crm.audit_log.action_restore",
+  export: "crm.audit_log.action_export",
+  import: "crm.audit_log.action_import",
+  merge: "crm.audit_log.action_merge",
+  bulk_delete: "crm.audit_log.action_bulk_delete",
+  bulk_update: "crm.audit_log.action_bulk_update",
 };
 
 export function AuditLogViewer({
@@ -125,10 +125,10 @@ export function AuditLogViewer({
     const diffHours = Math.floor(diffMs / 3600000);
     const diffDays = Math.floor(diffMs / 86400000);
 
-    if (diffMins < 1) return "Gerade eben";
-    if (diffMins < 60) return `vor ${diffMins} Min.`;
-    if (diffHours < 24) return `vor ${diffHours} Std.`;
-    if (diffDays < 7) return `vor ${diffDays} Tagen`;
+    if (diffMins < 1) return translate("crm.audit_log.just_now");
+    if (diffMins < 60) return translate("crm.audit_log.minutes_ago", { count: diffMins });
+    if (diffHours < 24) return translate("crm.audit_log.hours_ago", { count: diffHours });
+    if (diffDays < 7) return translate("crm.audit_log.days_ago", { count: diffDays });
     return formatDate(dateString);
   };
 
@@ -156,13 +156,13 @@ export function AuditLogViewer({
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">Alle Aktionen</SelectItem>
-                <SelectItem value="create">Erstellt</SelectItem>
-                <SelectItem value="update">Aktualisiert</SelectItem>
-                <SelectItem value="delete">Gelöscht</SelectItem>
-                <SelectItem value="restore">Wiederhergestellt</SelectItem>
-                <SelectItem value="export">Exportiert</SelectItem>
-                <SelectItem value="import">Importiert</SelectItem>
+                <SelectItem value="all">{translate("crm.audit_log.all_actions")}</SelectItem>
+                <SelectItem value="create">{translate("crm.audit_log.action_create")}</SelectItem>
+                <SelectItem value="update">{translate("crm.audit_log.action_update")}</SelectItem>
+                <SelectItem value="delete">{translate("crm.audit_log.action_delete")}</SelectItem>
+                <SelectItem value="restore">{translate("crm.audit_log.action_restore")}</SelectItem>
+                <SelectItem value="export">{translate("crm.audit_log.action_export")}</SelectItem>
+                <SelectItem value="import">{translate("crm.audit_log.action_import")}</SelectItem>
               </SelectContent>
             </Select>
           )}
@@ -173,12 +173,12 @@ export function AuditLogViewer({
         <ScrollArea style={{ maxHeight }} className="pr-4">
           {isPending ? (
             <div className="flex items-center justify-center py-8 text-muted-foreground">
-              Lade Protokoll...
+              {translate("crm.audit_log.loading")}
             </div>
           ) : auditLogs.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-8 text-muted-foreground">
               <History className="h-12 w-12 mb-2 opacity-50" />
-              <p>Keine Einträge gefunden</p>
+              <p>{translate("crm.audit_log.no_entries")}</p>
             </div>
           ) : (
             <div className="space-y-2">
@@ -190,6 +190,7 @@ export function AuditLogViewer({
                   onToggle={() => toggleExpanded(log.id)}
                   formatDate={formatDate}
                   formatRelativeTime={formatRelativeTime}
+                  translate={translate}
                 />
               ))}
             </div>
@@ -206,6 +207,7 @@ interface AuditLogEntryProps {
   onToggle: () => void;
   formatDate: (date: string) => string;
   formatRelativeTime: (date: string) => string;
+  translate: (key: string, options?: Record<string, unknown>) => string;
 }
 
 function AuditLogEntry({
@@ -214,6 +216,7 @@ function AuditLogEntry({
   onToggle,
   formatDate,
   formatRelativeTime,
+  translate,
 }: AuditLogEntryProps) {
   const ActionIcon = ACTION_ICONS[log.action] || FileEdit;
   const hasDetails = log.changed_fields?.length || log.old_values || log.new_values;
@@ -240,14 +243,14 @@ function AuditLogEntry({
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2 flex-wrap">
                 <Badge variant="outline" className="text-xs">
-                  {ACTION_LABELS[log.action]}
+                  {translate(ACTION_LABEL_KEYS[log.action])}
                 </Badge>
                 <span className="text-sm font-medium truncate">
                   {log.resource_name || `${log.resource_type} #${log.resource_id}`}
                 </span>
                 {log.affected_count > 1 && (
                   <Badge variant="secondary" className="text-xs">
-                    {log.affected_count} Einträge
+                    {log.affected_count} {translate("crm.audit_log.entries")}
                   </Badge>
                 )}
               </div>
@@ -265,8 +268,8 @@ function AuditLogEntry({
 
               {log.changed_fields && log.changed_fields.length > 0 && !isExpanded && (
                 <div className="mt-1 text-xs text-muted-foreground">
-                  Geändert: {log.changed_fields.slice(0, 3).join(", ")}
-                  {log.changed_fields.length > 3 && ` +${log.changed_fields.length - 3} weitere`}
+                {translate("crm.audit_log.changed")}: {log.changed_fields.slice(0, 3).join(", ")}
+                  {log.changed_fields.length > 3 && ` ${translate("crm.audit_log.more_items", { count: log.changed_fields.length - 3 })}`}
                 </div>
               )}
             </div>
@@ -289,7 +292,7 @@ function AuditLogEntry({
               {log.changed_fields && log.changed_fields.length > 0 && (
                 <div>
                   <h4 className="text-xs font-medium text-muted-foreground mb-2">
-                    Geänderte Felder
+                    {translate("crm.audit_log.changed_fields")}
                   </h4>
                   <div className="flex flex-wrap gap-1">
                     {log.changed_fields.map((field) => (
@@ -306,22 +309,24 @@ function AuditLogEntry({
                   {log.old_values && (
                     <div>
                       <h4 className="text-xs font-medium text-muted-foreground mb-2">
-                        Alter Wert
+                        {translate("crm.audit_log.old_value")}
                       </h4>
                       <ChangeValues 
                         values={log.old_values} 
                         changedFields={log.changed_fields || []} 
+                        translate={translate}
                       />
                     </div>
                   )}
                   {log.new_values && (
                     <div>
                       <h4 className="text-xs font-medium text-muted-foreground mb-2">
-                        Neuer Wert
+                        {translate("crm.audit_log.new_value")}
                       </h4>
                       <ChangeValues 
                         values={log.new_values} 
                         changedFields={log.changed_fields || []} 
+                        translate={translate}
                       />
                     </div>
                   )}
@@ -331,7 +336,7 @@ function AuditLogEntry({
               {log.metadata && Object.keys(log.metadata).length > 0 && (
                 <div>
                   <h4 className="text-xs font-medium text-muted-foreground mb-2">
-                    Zusätzliche Informationen
+                    {translate("crm.audit_log.additional_info")}
                   </h4>
                   <pre className="text-xs bg-muted p-2 rounded overflow-auto max-h-32">
                     {JSON.stringify(log.metadata, null, 2)}
@@ -349,9 +354,10 @@ function AuditLogEntry({
 interface ChangeValuesProps {
   values: Record<string, unknown>;
   changedFields: string[];
+  translate: (key: string, options?: Record<string, unknown>) => string;
 }
 
-function ChangeValues({ values, changedFields }: ChangeValuesProps) {
+function ChangeValues({ values, changedFields, translate }: ChangeValuesProps) {
   // Zeige nur geänderte Felder oder alle wenn keine angegeben
   const fieldsToShow = changedFields.length > 0 
     ? changedFields.filter(f => f in values)
@@ -367,22 +373,22 @@ function ChangeValues({ values, changedFields }: ChangeValuesProps) {
         <div key={field} className="text-xs">
           <span className="font-medium">{field}:</span>{" "}
           <span className="text-muted-foreground">
-            {formatValue(values[field])}
+            {formatValue(values[field], translate)}
           </span>
         </div>
       ))}
       {fieldsToShow.length > 10 && (
         <div className="text-xs text-muted-foreground">
-          +{fieldsToShow.length - 10} weitere Felder
+          {translate("crm.audit_log.more_fields", { count: fieldsToShow.length - 10 })}
         </div>
       )}
     </div>
   );
 }
 
-function formatValue(value: unknown): string {
+function formatValue(value: unknown, translate: (key: string) => string): string {
   if (value === null || value === undefined) return "-";
-  if (typeof value === "boolean") return value ? "Ja" : "Nein";
+  if (typeof value === "boolean") return value ? translate("crm.audit_log.yes") : translate("crm.audit_log.no");
   if (typeof value === "object") return JSON.stringify(value);
   if (typeof value === "string" && value.length > 50) {
     return value.substring(0, 50) + "...";

@@ -5,6 +5,7 @@ import {
   useUpdate,
   useNotify,
   useRefresh,
+  useTranslate,
 } from "ra-core";
 import {
   Plus,
@@ -121,6 +122,7 @@ export function CustomFieldsManager({
 }: CustomFieldsManagerProps) {
   const notify = useNotify();
   const refresh = useRefresh();
+  const translate = useTranslate();
 
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [editingField, setEditingField] =
@@ -198,7 +200,7 @@ export function CustomFieldsManager({
 
   const handleCreate = async () => {
     if (!formData.name.trim() || !formData.label.trim()) {
-      notify("Bitte füllen Sie alle Pflichtfelder aus", { type: "error" });
+      notify(translate("crm.custom_fields.fill_required"), { type: "error" });
       return;
     }
 
@@ -221,18 +223,18 @@ export function CustomFieldsManager({
 
     try {
       await create("custom_field_definitions", { data });
-      notify("Feld erstellt", { type: "success" });
+      notify(translate("crm.custom_fields.created"), { type: "success" });
       setIsCreateDialogOpen(false);
       resetForm();
       refresh();
     } catch (error: unknown) {
-      notify(error instanceof Error ? error.message : "Fehler beim Erstellen", { type: "error" });
+      notify(error instanceof Error ? error.message : translate("crm.custom_fields.error_create"), { type: "error" });
     }
   };
 
   const handleUpdate = async () => {
     if (!editingField || !formData.name.trim() || !formData.label.trim()) {
-      notify("Bitte füllen Sie alle Pflichtfelder aus", { type: "error" });
+      notify(translate("crm.custom_fields.fill_required"), { type: "error" });
       return;
     }
 
@@ -254,12 +256,12 @@ export function CustomFieldsManager({
         data,
         previousData: editingField,
       });
-      notify("Feld aktualisiert", { type: "success" });
+      notify(translate("crm.custom_fields.updated"), { type: "success" });
       setEditingField(null);
       resetForm();
       refresh();
     } catch (error: unknown) {
-      notify(error instanceof Error ? error.message : "Fehler beim Aktualisieren", { type: "error" });
+      notify(error instanceof Error ? error.message : translate("crm.custom_fields.error_update"), { type: "error" });
     }
   };
 
@@ -273,11 +275,11 @@ export function CustomFieldsManager({
         data: { deleted_at: new Date().toISOString() },
         previousData: deleteConfirmField,
       });
-      notify("Feld gelöscht", { type: "success" });
+      notify(translate("crm.custom_fields.deleted"), { type: "success" });
       setDeleteConfirmField(null);
       refresh();
     } catch (error: unknown) {
-      notify(error instanceof Error ? error.message : "Fehler beim Löschen", { type: "error" });
+      notify(error instanceof Error ? error.message : translate("crm.custom_fields.error_delete"), { type: "error" });
     }
   };
 
@@ -304,10 +306,10 @@ export function CustomFieldsManager({
   };
 
   const title = customObjectName
-    ? `Felder für "${customObjectName}"`
+    ? translate("crm.custom_fields.fields_for", { name: customObjectName })
     : entityType
-    ? `Custom Fields`
-    : "Felder";
+    ? translate("crm.custom_fields.title")
+    : translate("crm.custom_fields.fields");
 
   return (
     <Card>
@@ -325,7 +327,7 @@ export function CustomFieldsManager({
             }}
           >
             <Plus className="w-4 h-4 mr-1" />
-            Feld hinzufügen
+            {translate("crm.custom_fields.add_field")}
           </Button>
         </div>
       </CardHeader>
@@ -333,14 +335,14 @@ export function CustomFieldsManager({
         <ScrollArea className="h-[450px] pr-2">
           {isLoading ? (
             <div className="text-center py-8 text-muted-foreground">
-              Lade...
+              {translate("crm.custom_fields.loading")}
             </div>
           ) : fields?.length === 0 ? (
             <div className="text-center py-8 text-muted-foreground">
               <Type className="w-12 h-12 mx-auto mb-2 opacity-50" />
-              <p>Keine Felder vorhanden</p>
+              <p>{translate("crm.custom_fields.no_fields")}</p>
               <p className="text-sm mt-2">
-                Fügen Sie benutzerdefinierte Felder hinzu
+                {translate("crm.custom_fields.add_custom_fields")}
               </p>
             </div>
           ) : (
@@ -365,12 +367,12 @@ export function CustomFieldsManager({
                         </span>
                         {field.is_required && (
                           <Badge variant="destructive" className="text-xs">
-                            Pflicht
+                            {translate("crm.custom_fields.required")}
                           </Badge>
                         )}
                         {field.is_unique && (
                           <Badge variant="outline" className="text-xs">
-                            Eindeutig
+                            {translate("crm.custom_fields.unique")}
                           </Badge>
                         )}
                       </div>
@@ -421,19 +423,19 @@ export function CustomFieldsManager({
         <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>
-              {editingField ? "Feld bearbeiten" : "Neues Feld erstellen"}
+              {editingField ? translate("crm.custom_fields.edit_dialog_title") : translate("crm.custom_fields.create_dialog_title")}
             </DialogTitle>
             <DialogDescription>
               {editingField
-                ? "Ändern Sie die Eigenschaften des Felds."
-                : "Definieren Sie ein neues benutzerdefiniertes Feld."}
+                ? translate("crm.custom_fields.edit_dialog_desc")
+                : translate("crm.custom_fields.create_dialog_desc")}
             </DialogDescription>
           </DialogHeader>
 
           <div className="space-y-4 py-4">
             {/* Feldtyp */}
             <div className="space-y-2">
-              <Label>Feldtyp *</Label>
+              <Label>{translate("crm.custom_fields.field_type")} *</Label>
               <Select
                 value={formData.field_type}
                 onValueChange={(v) =>
@@ -465,14 +467,14 @@ export function CustomFieldsManager({
               </Select>
               {editingField && (
                 <p className="text-xs text-muted-foreground">
-                  Der Feldtyp kann nicht mehr geändert werden
+                  {translate("crm.custom_fields.field_type_locked")}
                 </p>
               )}
             </div>
 
             {/* Label */}
             <div className="space-y-2">
-              <Label htmlFor="field-label">Anzeigename *</Label>
+              <Label htmlFor="field-label">{translate("crm.custom_fields.display_name")} *</Label>
               <Input
                 id="field-label"
                 value={formData.label}
@@ -483,7 +485,7 @@ export function CustomFieldsManager({
 
             {/* Name (technisch) */}
             <div className="space-y-2">
-              <Label htmlFor="field-name">Technischer Name *</Label>
+              <Label htmlFor="field-name">{translate("crm.custom_fields.technical_name")} *</Label>
               <Input
                 id="field-name"
                 value={formData.name}
@@ -498,7 +500,7 @@ export function CustomFieldsManager({
 
             {/* Beschreibung */}
             <div className="space-y-2">
-              <Label htmlFor="field-description">Beschreibung</Label>
+              <Label htmlFor="field-description">{translate("crm.custom_fields.description")}</Label>
               <Textarea
                 id="field-description"
                 value={formData.description}
@@ -508,7 +510,7 @@ export function CustomFieldsManager({
                     description: e.target.value,
                   }))
                 }
-                placeholder="Optionale Beschreibung..."
+                placeholder={translate("crm.custom_fields.description_placeholder")}
                 rows={2}
               />
             </div>
@@ -517,12 +519,12 @@ export function CustomFieldsManager({
             {(formData.field_type === "select" ||
               formData.field_type === "multiselect") && (
               <div className="space-y-2">
-                <Label>Auswahloptionen</Label>
+                <Label>{translate("crm.custom_fields.select_options")}</Label>
                 <div className="flex gap-2">
                   <Input
                     value={newOption}
                     onChange={(e) => setNewOption(e.target.value)}
-                    placeholder="Neue Option..."
+                    placeholder={translate("crm.custom_fields.new_option")}
                     onKeyDown={(e) => {
                       if (e.key === "Enter") {
                         e.preventDefault();
@@ -560,7 +562,7 @@ export function CustomFieldsManager({
             {formData.field_type === "reference" && (
               <>
                 <div className="space-y-2">
-                  <Label>Referenz-Objekt</Label>
+                  <Label>{translate("crm.custom_fields.reference_object")}</Label>
                   <Select
                     value={formData.reference_object}
                     onValueChange={(v) =>
@@ -568,18 +570,18 @@ export function CustomFieldsManager({
                     }
                   >
                     <SelectTrigger>
-                      <SelectValue placeholder="Objekt auswählen..." />
+                      <SelectValue placeholder={translate("crm.custom_fields.select_object")} />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="contacts">Kontakte</SelectItem>
-                      <SelectItem value="companies">Unternehmen</SelectItem>
-                      <SelectItem value="deals">Deals</SelectItem>
+                      <SelectItem value="contacts">{translate("crm.custom_fields.ref_contacts")}</SelectItem>
+                      <SelectItem value="companies">{translate("crm.custom_fields.ref_companies")}</SelectItem>
+                      <SelectItem value="deals">{translate("crm.custom_fields.ref_deals")}</SelectItem>
                       {/* Hier könnten dynamisch Custom Objects geladen werden */}
                     </SelectContent>
                   </Select>
                 </div>
                 <div className="space-y-2">
-                  <Label>Anzeigefeld</Label>
+                  <Label>{translate("crm.custom_fields.display_field")}</Label>
                   <Input
                     value={formData.reference_display_field}
                     onChange={(e) =>
@@ -597,7 +599,7 @@ export function CustomFieldsManager({
             {/* Platzhalter & Hilfetext */}
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="placeholder">Platzhalter</Label>
+                <Label htmlFor="placeholder">{translate("crm.custom_fields.placeholder")}</Label>
                 <Input
                   id="placeholder"
                   value={formData.placeholder}
@@ -611,7 +613,7 @@ export function CustomFieldsManager({
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="help_text">Hilfetext</Label>
+                <Label htmlFor="help_text">{translate("crm.custom_fields.help_text")}</Label>
                 <Input
                   id="help_text"
                   value={formData.help_text}
@@ -628,7 +630,7 @@ export function CustomFieldsManager({
 
             {/* Standardwert */}
             <div className="space-y-2">
-              <Label htmlFor="default_value">Standardwert</Label>
+              <Label htmlFor="default_value">{translate("crm.custom_fields.default_value")}</Label>
               <Input
                 id="default_value"
                 value={formData.default_value}
@@ -638,13 +640,13 @@ export function CustomFieldsManager({
                     default_value: e.target.value,
                   }))
                 }
-                placeholder="Optionaler Standardwert"
+                placeholder={translate("crm.custom_fields.default_value_placeholder")}
               />
             </div>
 
             {/* Feldgruppe */}
             <div className="space-y-2">
-              <Label htmlFor="field_group">Feldgruppe</Label>
+              <Label htmlFor="field_group">{translate("crm.custom_fields.field_group")}</Label>
               <Input
                 id="field_group"
                 value={formData.field_group}
@@ -660,11 +662,11 @@ export function CustomFieldsManager({
 
             {/* Optionen */}
             <div className="space-y-3 pt-2 border-t">
-              <Label className="text-sm font-medium">Optionen</Label>
+              <Label className="text-sm font-medium">{translate("crm.custom_objects.options")}</Label>
 
               <div className="grid grid-cols-2 gap-4">
                 <div className="flex items-center justify-between">
-                  <div className="text-sm">Pflichtfeld</div>
+                  <div className="text-sm">{translate("crm.custom_fields.option_required")}</div>
                   <Switch
                     checked={formData.is_required}
                     onCheckedChange={(v) =>
@@ -674,7 +676,7 @@ export function CustomFieldsManager({
                 </div>
 
                 <div className="flex items-center justify-between">
-                  <div className="text-sm">Eindeutig</div>
+                  <div className="text-sm">{translate("crm.custom_fields.option_unique")}</div>
                   <Switch
                     checked={formData.is_unique}
                     onCheckedChange={(v) =>
@@ -684,7 +686,7 @@ export function CustomFieldsManager({
                 </div>
 
                 <div className="flex items-center justify-between">
-                  <div className="text-sm">In Liste zeigen</div>
+                  <div className="text-sm">{translate("crm.custom_fields.option_show_in_list")}</div>
                   <Switch
                     checked={formData.show_in_list}
                     onCheckedChange={(v) =>
@@ -694,7 +696,7 @@ export function CustomFieldsManager({
                 </div>
 
                 <div className="flex items-center justify-between">
-                  <div className="text-sm">In Details zeigen</div>
+                  <div className="text-sm">{translate("crm.custom_fields.option_show_in_detail")}</div>
                   <Switch
                     checked={formData.show_in_detail}
                     onCheckedChange={(v) =>
@@ -716,11 +718,11 @@ export function CustomFieldsManager({
               }}
             >
               <X className="w-4 h-4 mr-2" />
-              Abbrechen
+              {translate("crm.cancel")}
             </Button>
             <Button onClick={editingField ? handleUpdate : handleCreate}>
               <Save className="w-4 h-4 mr-2" />
-              {editingField ? "Speichern" : "Erstellen"}
+              {editingField ? translate("crm.save") : translate("crm.create")}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -733,21 +735,18 @@ export function CustomFieldsManager({
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Feld löschen?</AlertDialogTitle>
+            <AlertDialogTitle>{translate("crm.custom_fields.delete_title")}</AlertDialogTitle>
             <AlertDialogDescription>
-              Möchten Sie das Feld "{deleteConfirmField?.label}" wirklich
-              löschen? Alle gespeicherten Werte für dieses Feld werden
-              ebenfalls gelöscht. Diese Aktion kann nicht rückgängig gemacht
-              werden.
+              {translate("crm.custom_fields.delete_desc", { label: deleteConfirmField?.label })}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Abbrechen</AlertDialogCancel>
+            <AlertDialogCancel>{translate("crm.cancel")}</AlertDialogCancel>
             <AlertDialogAction
               onClick={handleDelete}
               className="bg-red-600 hover:bg-red-700"
             >
-              Löschen
+              {translate("crm.delete")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

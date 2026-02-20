@@ -6,6 +6,7 @@ import {
   useDelete,
   useNotify,
   useRefresh,
+  useTranslate,
 } from "ra-core";
 import {
   Card,
@@ -75,6 +76,7 @@ export function UserAttributesManager({
 }: UserAttributesManagerProps) {
   const notify = useNotify();
   const refresh = useRefresh();
+  const translate = useTranslate();
   const [create] = useCreate();
   const [update] = useUpdate();
   const [deleteOne] = useDelete();
@@ -142,7 +144,7 @@ export function UserAttributesManager({
 
   const handleSubmit = async () => {
     if (!formData.sales_id || !formData.attribute_name || !formData.attribute_value) {
-      notify("Alle Felder sind erforderlich", { type: "error" });
+      notify(translate("crm.rbac.all_fields_required"), { type: "error" });
       return;
     }
 
@@ -157,7 +159,7 @@ export function UserAttributesManager({
           },
           {
             onSuccess: () => {
-              notify("Attribut aktualisiert", { type: "success" });
+              notify(translate("crm.rbac.attribute_updated"), { type: "success" });
               setIsDialogOpen(false);
               resetForm();
               refresh();
@@ -170,7 +172,7 @@ export function UserAttributesManager({
           { data: formData },
           {
             onSuccess: () => {
-              notify("Attribut zugewiesen", { type: "success" });
+              notify(translate("crm.rbac.attribute_assigned"), { type: "success" });
               setIsDialogOpen(false);
               resetForm();
               refresh();
@@ -179,7 +181,7 @@ export function UserAttributesManager({
         );
       }
     } catch (error: unknown) {
-      notify(error instanceof Error ? error.message : "Fehler beim Speichern", { type: "error" });
+      notify(error instanceof Error ? error.message : translate("crm.rbac.error_save"), { type: "error" });
     }
   };
 
@@ -192,7 +194,7 @@ export function UserAttributesManager({
         { id: attributeToDelete.id, previousData: attributeToDelete },
         {
           onSuccess: () => {
-            notify("Attribut entfernt", { type: "success" });
+              notify(translate("crm.rbac.attribute_removed"), { type: "success" });
             setIsDeleteDialogOpen(false);
             setAttributeToDelete(null);
             refresh();
@@ -200,7 +202,7 @@ export function UserAttributesManager({
         }
       );
     } catch (error: unknown) {
-      notify(error instanceof Error ? error.message : "Fehler beim Löschen", { type: "error" });
+      notify(error instanceof Error ? error.message : translate("crm.rbac.error_delete"), { type: "error" });
     }
   };
 
@@ -235,33 +237,33 @@ export function UserAttributesManager({
           <div>
             <CardTitle className="flex items-center gap-2">
               <User className="h-5 w-5" />
-              Benutzerattribute
+              {translate("crm.rbac.user_attributes")}
             </CardTitle>
             <CardDescription>
-              Weisen Sie Benutzern Attribute zu (z.B. Region, Abteilung)
+              {translate("crm.rbac.user_attributes_desc")}
             </CardDescription>
           </div>
           <Button onClick={openCreateDialog}>
             <Plus className="h-4 w-4 mr-2" />
-            Attribut zuweisen
+            {translate("crm.rbac.assign_attribute")}
           </Button>
         </div>
       </CardHeader>
       <CardContent>
         {attributesLoading ? (
-          <div className="text-center py-4 text-muted-foreground">Laden...</div>
+          <div className="text-center py-4 text-muted-foreground">{translate("crm.rbac.loading")}</div>
         ) : !userAttributes?.length ? (
           <div className="text-center py-8 text-muted-foreground">
-            Keine Benutzerattribute zugewiesen
+            {translate("crm.rbac.no_user_attributes")}
           </div>
         ) : salesId ? (
           // Einfache Tabelle wenn nur ein Benutzer
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Attribut</TableHead>
-                <TableHead>Wert</TableHead>
-                <TableHead className="w-[100px]">Aktionen</TableHead>
+                <TableHead>{translate("crm.rbac.attribute")}</TableHead>
+                <TableHead>{translate("crm.rbac.value_label")}</TableHead>
+                <TableHead className="w-[100px]">{translate("crm.actions")}</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -341,17 +343,17 @@ export function UserAttributesManager({
           <DialogContent>
             <DialogHeader>
               <DialogTitle>
-                {editingAttribute ? "Attribut bearbeiten" : "Attribut zuweisen"}
+                {editingAttribute ? translate("crm.rbac.edit_attribute_dialog") : translate("crm.rbac.assign_attribute_dialog")}
               </DialogTitle>
               <DialogDescription>
-                Weisen Sie einem Benutzer ein Attribut zu
+                {translate("crm.rbac.assign_dialog_desc")}
               </DialogDescription>
             </DialogHeader>
 
             <div className="space-y-4 py-4">
               {!salesId && (
                 <div className="space-y-2">
-                  <Label>Benutzer</Label>
+                  <Label>{translate("crm.rbac.user")}</Label>
                   <Select
                     value={formData.sales_id?.toString() || ""}
                     onValueChange={(value) =>
@@ -360,7 +362,7 @@ export function UserAttributesManager({
                     disabled={!!editingAttribute}
                   >
                     <SelectTrigger>
-                      <SelectValue placeholder="Benutzer auswählen" />
+                      <SelectValue placeholder={translate("crm.rbac.select_user_label")} />
                     </SelectTrigger>
                     <SelectContent>
                       {sales?.map((s: Sale) => (
@@ -374,7 +376,7 @@ export function UserAttributesManager({
               )}
 
               <div className="space-y-2">
-                <Label>Attribut</Label>
+                <Label>{translate("crm.rbac.attribute")}</Label>
                 <Select
                   value={formData.attribute_name}
                   onValueChange={(value) =>
@@ -383,7 +385,7 @@ export function UserAttributesManager({
                   disabled={!!editingAttribute}
                 >
                   <SelectTrigger>
-                    <SelectValue placeholder="Attribut auswählen" />
+                    <SelectValue placeholder={translate("crm.rbac.select_attribute")} />
                   </SelectTrigger>
                   <SelectContent>
                     {attributeDefinitions
@@ -398,7 +400,7 @@ export function UserAttributesManager({
               </div>
 
               <div className="space-y-2">
-                <Label>Wert</Label>
+                <Label>{translate("crm.rbac.value_label")}</Label>
                 {selectedAttributeDef?.data_type === "select" &&
                 selectedAttributeDef.allowed_values ? (
                   <Select
@@ -408,7 +410,7 @@ export function UserAttributesManager({
                     }
                   >
                     <SelectTrigger>
-                      <SelectValue placeholder="Wert auswählen" />
+                      <SelectValue placeholder={translate("crm.rbac.select_value")} />
                     </SelectTrigger>
                     <SelectContent>
                       {selectedAttributeDef.allowed_values.map((val) => (
@@ -424,7 +426,7 @@ export function UserAttributesManager({
                     onChange={(e) =>
                       setFormData({ ...formData, attribute_value: e.target.value })
                     }
-                    placeholder="Wert eingeben"
+                    placeholder={translate("crm.rbac.enter_value")}
                     type={selectedAttributeDef?.data_type === "number" ? "number" : "text"}
                   />
                 )}
@@ -433,10 +435,10 @@ export function UserAttributesManager({
 
             <DialogFooter>
               <Button variant="outline" onClick={() => setIsDialogOpen(false)}>
-                Abbrechen
+                {translate("crm.cancel")}
               </Button>
               <Button onClick={handleSubmit}>
-                {editingAttribute ? "Speichern" : "Zuweisen"}
+                {editingAttribute ? translate("crm.save") : translate("crm.rbac.assign")}
               </Button>
             </DialogFooter>
           </DialogContent>
@@ -446,15 +448,14 @@ export function UserAttributesManager({
         <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
           <AlertDialogContent>
             <AlertDialogHeader>
-              <AlertDialogTitle>Attribut entfernen?</AlertDialogTitle>
+              <AlertDialogTitle>{translate("crm.rbac.remove_attribute_title")}</AlertDialogTitle>
               <AlertDialogDescription>
-                Möchten Sie das Attribut "{attributeToDelete?.attribute_name}" wirklich
-                entfernen?
+                {translate("crm.rbac.remove_attribute_desc", { name: attributeToDelete?.attribute_name })}
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
-              <AlertDialogCancel>Abbrechen</AlertDialogCancel>
-              <AlertDialogAction onClick={handleDelete}>Entfernen</AlertDialogAction>
+              <AlertDialogCancel>{translate("crm.cancel")}</AlertDialogCancel>
+              <AlertDialogAction onClick={handleDelete}>{translate("crm.rbac.remove")}</AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>

@@ -146,24 +146,24 @@ export function CustomObjectsManager() {
 
   const handleCreate = async () => {
     if (!formData.name.trim() || !formData.label.trim()) {
-      notify("Bitte füllen Sie alle Pflichtfelder aus", { type: "error" });
+      notify(translate("crm.custom_objects.fill_required"), { type: "error" });
       return;
     }
 
     try {
       await create("custom_object_definitions", { data: formData });
-      notify("Objekt erstellt", { type: "success" });
+      notify(translate("crm.custom_objects.created"), { type: "success" });
       setIsCreateDialogOpen(false);
       resetForm();
       refresh();
     } catch (error: unknown) {
-      notify(error instanceof Error ? error.message : "Fehler beim Erstellen", { type: "error" });
+      notify(error instanceof Error ? error.message : translate("crm.custom_objects.error_create"), { type: "error" });
     }
   };
 
   const handleUpdate = async () => {
     if (!editingObject || !formData.name.trim() || !formData.label.trim()) {
-      notify("Bitte füllen Sie alle Pflichtfelder aus", { type: "error" });
+      notify(translate("crm.custom_objects.fill_required"), { type: "error" });
       return;
     }
 
@@ -173,12 +173,12 @@ export function CustomObjectsManager() {
         data: formData,
         previousData: editingObject,
       });
-      notify("Objekt aktualisiert", { type: "success" });
+      notify(translate("crm.custom_objects.updated"), { type: "success" });
       setEditingObject(null);
       resetForm();
       refresh();
     } catch (error: unknown) {
-      notify(error instanceof Error ? error.message : "Fehler beim Aktualisieren", { type: "error" });
+      notify(error instanceof Error ? error.message : translate("crm.custom_objects.error_update"), { type: "error" });
     }
   };
 
@@ -190,14 +190,14 @@ export function CustomObjectsManager() {
         id: deleteConfirmObject.id,
         previousData: deleteConfirmObject,
       });
-      notify("Objekt gelöscht", { type: "success" });
+      notify(translate("crm.custom_objects.deleted"), { type: "success" });
       if (selectedObjectId === deleteConfirmObject.id) {
         setSelectedObjectId(null);
       }
       setDeleteConfirmObject(null);
       refresh();
     } catch (error: unknown) {
-      notify(error instanceof Error ? error.message : "Fehler beim Löschen", { type: "error" });
+      notify(error instanceof Error ? error.message : translate("crm.custom_objects.error_delete"), { type: "error" });
     }
   };
 
@@ -248,7 +248,7 @@ export function CustomObjectsManager() {
               }}
             >
               <Plus className="w-4 h-4 mr-1" />
-              Neu
+              {translate("crm.custom_objects.new")}
             </Button>
           </div>
         </CardHeader>
@@ -256,14 +256,14 @@ export function CustomObjectsManager() {
           <ScrollArea className="h-[500px] pr-2">
             {isLoading ? (
               <div className="text-center py-8 text-muted-foreground">
-                Lade...
+                {translate("crm.custom_objects.loading")}
               </div>
             ) : objects?.length === 0 ? (
               <div className="text-center py-8 text-muted-foreground">
                 <Box className="w-12 h-12 mx-auto mb-2 opacity-50" />
-                <p>Keine Objekte vorhanden</p>
+                <p>{translate("crm.custom_objects.no_objects")}</p>
                 <p className="text-sm mt-2">
-                  Erstellen Sie Ihr erstes benutzerdefiniertes Objekt
+                  {translate("crm.custom_objects.create_first")}
                 </p>
               </div>
             ) : (
@@ -298,7 +298,7 @@ export function CustomObjectsManager() {
                         </span>
                         {!obj.is_active && (
                           <Badge variant="secondary" className="text-xs">
-                            Inaktiv
+                            {translate("crm.custom_objects.inactive")}
                           </Badge>
                         )}
                       </div>
@@ -362,7 +362,7 @@ export function CustomObjectsManager() {
             <div className="text-center p-8">
               <Settings2 className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
               <p className="text-muted-foreground">
-                Wählen Sie ein Objekt aus, um dessen Felder zu bearbeiten
+                {translate("crm.custom_objects.select_object")}
               </p>
             </div>
           </Card>
@@ -384,20 +384,20 @@ export function CustomObjectsManager() {
           <DialogHeader>
             <DialogTitle>
               {editingObject
-                ? "Objekt bearbeiten"
-                : "Neues Objekt erstellen"}
+                ? translate("crm.custom_objects.edit_dialog_title")
+                : translate("crm.custom_objects.create_dialog_title")}
             </DialogTitle>
             <DialogDescription>
               {editingObject
-                ? "Ändern Sie die Eigenschaften des Objekts."
-                : "Definieren Sie ein neues benutzerdefiniertes Objekt."}
+                ? translate("crm.custom_objects.edit_dialog_desc")
+                : translate("crm.custom_objects.create_dialog_desc")}
             </DialogDescription>
           </DialogHeader>
 
           <div className="space-y-4 py-4">
             {/* Label */}
             <div className="space-y-2">
-              <Label htmlFor="label">Anzeigename *</Label>
+              <Label htmlFor="label">{translate("crm.custom_objects.display_name")} *</Label>
               <Input
                 id="label"
                 value={formData.label}
@@ -408,7 +408,7 @@ export function CustomObjectsManager() {
 
             {/* Name (technisch) */}
             <div className="space-y-2">
-              <Label htmlFor="name">Technischer Name *</Label>
+              <Label htmlFor="name">{translate("crm.custom_objects.technical_name")} *</Label>
               <Input
                 id="name"
                 value={formData.name}
@@ -419,13 +419,13 @@ export function CustomObjectsManager() {
                 className="font-mono text-sm"
               />
               <p className="text-xs text-muted-foreground">
-                Nur Kleinbuchstaben, Zahlen und Unterstriche
+                {translate("crm.custom_objects.technical_name_hint")}
               </p>
             </div>
 
             {/* Plural */}
             <div className="space-y-2">
-              <Label htmlFor="label_plural">Plural *</Label>
+              <Label htmlFor="label_plural">{translate("crm.custom_objects.plural")} *</Label>
               <Input
                 id="label_plural"
                 value={formData.label_plural}
@@ -441,7 +441,7 @@ export function CustomObjectsManager() {
 
             {/* Beschreibung */}
             <div className="space-y-2">
-              <Label htmlFor="description">Beschreibung</Label>
+              <Label htmlFor="description">{translate("crm.custom_objects.description")}</Label>
               <Textarea
                 id="description"
                 value={formData.description}
@@ -451,7 +451,7 @@ export function CustomObjectsManager() {
                     description: e.target.value,
                   }))
                 }
-                placeholder="Optionale Beschreibung..."
+                placeholder={translate("crm.custom_objects.description_placeholder")}
                 rows={2}
               />
             </div>
@@ -480,7 +480,7 @@ export function CustomObjectsManager() {
               </div>
 
               <div className="space-y-2">
-                <Label>Farbe</Label>
+                <Label>{translate("crm.custom_objects.color")}</Label>
                 <div className="flex flex-wrap gap-1">
                   {COLORS.map((color) => (
                     <button
@@ -503,13 +503,13 @@ export function CustomObjectsManager() {
 
             {/* Optionen */}
             <div className="space-y-3 pt-2 border-t">
-              <Label className="text-sm font-medium">Optionen</Label>
+              <Label className="text-sm font-medium">{translate("crm.custom_objects.options")}</Label>
 
               <div className="flex items-center justify-between">
                 <div>
-                  <div className="text-sm">Aktiv</div>
+                  <div className="text-sm">{translate("crm.custom_objects.option_active")}</div>
                   <div className="text-xs text-muted-foreground">
-                    Objekt kann verwendet werden
+                    {translate("crm.custom_objects.option_active_desc")}
                   </div>
                 </div>
                 <Switch
@@ -522,9 +522,9 @@ export function CustomObjectsManager() {
 
               <div className="flex items-center justify-between">
                 <div>
-                  <div className="text-sm">Anhänge erlauben</div>
+                  <div className="text-sm">{translate("crm.custom_objects.option_attachments")}</div>
                   <div className="text-xs text-muted-foreground">
-                    Dateien können hochgeladen werden
+                    {translate("crm.custom_objects.option_attachments_desc")}
                   </div>
                 </div>
                 <Switch
@@ -537,9 +537,9 @@ export function CustomObjectsManager() {
 
               <div className="flex items-center justify-between">
                 <div>
-                  <div className="text-sm">Notizen erlauben</div>
+                  <div className="text-sm">{translate("crm.custom_objects.option_notes")}</div>
                   <div className="text-xs text-muted-foreground">
-                    Notizen können hinzugefügt werden
+                    {translate("crm.custom_objects.option_notes_desc")}
                   </div>
                 </div>
                 <Switch
@@ -552,9 +552,9 @@ export function CustomObjectsManager() {
 
               <div className="flex items-center justify-between">
                 <div>
-                  <div className="text-sm">Aufgaben erlauben</div>
+                  <div className="text-sm">{translate("crm.custom_objects.option_tasks")}</div>
                   <div className="text-xs text-muted-foreground">
-                    Aufgaben können zugewiesen werden
+                    {translate("crm.custom_objects.option_tasks_desc")}
                   </div>
                 </div>
                 <Switch
@@ -577,11 +577,11 @@ export function CustomObjectsManager() {
               }}
             >
               <X className="w-4 h-4 mr-2" />
-              Abbrechen
+              {translate("crm.cancel")}
             </Button>
             <Button onClick={editingObject ? handleUpdate : handleCreate}>
               <Save className="w-4 h-4 mr-2" />
-              {editingObject ? "Speichern" : "Erstellen"}
+              {editingObject ? translate("crm.save") : translate("crm.create")}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -594,20 +594,18 @@ export function CustomObjectsManager() {
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Objekt löschen?</AlertDialogTitle>
+            <AlertDialogTitle>{translate("crm.custom_objects.delete_title")}</AlertDialogTitle>
             <AlertDialogDescription>
-              Möchten Sie das Objekt "{deleteConfirmObject?.label}" wirklich
-              löschen? Alle zugehörigen Felder und Daten werden ebenfalls
-              gelöscht. Diese Aktion kann nicht rückgängig gemacht werden.
+              {translate("crm.custom_objects.delete_desc", { label: deleteConfirmObject?.label })}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Abbrechen</AlertDialogCancel>
+            <AlertDialogCancel>{translate("crm.cancel")}</AlertDialogCancel>
             <AlertDialogAction
               onClick={handleDelete}
               className="bg-red-600 hover:bg-red-700"
             >
-              Löschen
+              {translate("crm.delete")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

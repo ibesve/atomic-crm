@@ -6,6 +6,7 @@ import {
   useDelete,
   useNotify,
   useRefresh,
+  useTranslate,
 } from "ra-core";
 import {
   Card,
@@ -89,6 +90,7 @@ export function PermissionConditionsManager({
 }: PermissionConditionsManagerProps) {
   const notify = useNotify();
   const refresh = useRefresh();
+  const translate = useTranslate();
   const [create] = useCreate();
   const [update] = useUpdate();
   const [deleteOne] = useDelete();
@@ -176,7 +178,7 @@ export function PermissionConditionsManager({
 
   const handleSubmit = async () => {
     if (!formData.role_permission_id || !formData.target_field) {
-      notify("Berechtigung und Zielfeld sind erforderlich", { type: "error" });
+      notify(translate("crm.rbac.permission_target_required"), { type: "error" });
       return;
     }
 
@@ -201,7 +203,7 @@ export function PermissionConditionsManager({
           },
           {
             onSuccess: () => {
-              notify("Bedingung aktualisiert", { type: "success" });
+              notify(translate("crm.rbac.condition_updated"), { type: "success" });
               setIsDialogOpen(false);
               resetForm();
               refresh();
@@ -214,7 +216,7 @@ export function PermissionConditionsManager({
           { data },
           {
             onSuccess: () => {
-              notify("Bedingung erstellt", { type: "success" });
+              notify(translate("crm.rbac.condition_created"), { type: "success" });
               setIsDialogOpen(false);
               resetForm();
               refresh();
@@ -223,7 +225,7 @@ export function PermissionConditionsManager({
         );
       }
     } catch (error: unknown) {
-      notify(error instanceof Error ? error.message : "Fehler beim Speichern", { type: "error" });
+      notify(error instanceof Error ? error.message : translate("crm.rbac.error_save"), { type: "error" });
     }
   };
 
@@ -236,7 +238,7 @@ export function PermissionConditionsManager({
         { id: conditionToDelete.id, previousData: conditionToDelete },
         {
           onSuccess: () => {
-            notify("Bedingung gelöscht", { type: "success" });
+            notify(translate("crm.rbac.condition_deleted"), { type: "success" });
             setIsDeleteDialogOpen(false);
             setConditionToDelete(null);
             refresh();
@@ -260,15 +262,15 @@ export function PermissionConditionsManager({
         {
           onSuccess: () => {
             notify(
-              condition.is_active ? "Bedingung deaktiviert" : "Bedingung aktiviert",
+              condition.is_active ? translate("crm.rbac.condition_deactivated") : translate("crm.rbac.condition_activated"),
               { type: "success" }
             );
             refresh();
           },
         }
       );
-    } catch (error: any) {
-      notify(error.message || "Fehler", { type: "error" });
+    } catch (error: unknown) {
+      notify(error instanceof Error ? error.message : "Fehler", { type: "error" });
     }
   };
 
@@ -314,7 +316,7 @@ export function PermissionConditionsManager({
     } else if (condition.operator === "IN" || condition.operator === "NOT IN") {
       valueDisplay = `[${condition.static_values?.join(", ")}]`;
     } else if (condition.source_type === "current_user") {
-      valueDisplay = "Aktueller Benutzer";
+      valueDisplay = translate("crm.rbac.current_user");
     } else {
       valueDisplay = `${sourceLabel}: ${condition.source_attribute}`;
     }
@@ -329,38 +331,38 @@ export function PermissionConditionsManager({
           <div>
             <CardTitle className="flex items-center gap-2">
               <Filter className="h-5 w-5" />
-              Attributbedingungen (ABAC)
+              {translate("crm.rbac.conditions_title")}
             </CardTitle>
             <CardDescription>
-              Definieren Sie zusätzliche Bedingungen für Berechtigungen basierend auf Attributen
+              {translate("crm.rbac.conditions_desc")}
             </CardDescription>
           </div>
           <Button onClick={openCreateDialog}>
             <Plus className="h-4 w-4 mr-2" />
-            Neue Bedingung
+            {translate("crm.rbac.new_condition")}
           </Button>
         </div>
       </CardHeader>
       <CardContent>
         {isLoading ? (
-          <div className="text-center py-4 text-muted-foreground">Laden...</div>
+          <div className="text-center py-4 text-muted-foreground">{translate("crm.rbac.loading")}</div>
         ) : !conditions?.length ? (
           <div className="text-center py-8 text-muted-foreground">
             <Filter className="h-12 w-12 mx-auto mb-2 opacity-50" />
-            <p>Keine Attributbedingungen definiert</p>
+            <p>{translate("crm.rbac.no_conditions")}</p>
             <p className="text-sm mt-1">
-              Bedingungen ermöglichen feinere Zugriffskontrollen basierend auf Benutzer- oder Rollenattributen
+              {translate("crm.rbac.no_conditions_desc")}
             </p>
           </div>
         ) : (
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Berechtigung</TableHead>
-                <TableHead>Bedingung</TableHead>
-                <TableHead>Logik</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead className="w-[120px]">Aktionen</TableHead>
+                <TableHead>{translate("crm.rbac.permission")}</TableHead>
+                <TableHead>{translate("crm.rbac.condition")}</TableHead>
+                <TableHead>{translate("crm.rbac.logic")}</TableHead>
+                <TableHead>{translate("crm.status")}</TableHead>
+                <TableHead className="w-[120px]">{translate("crm.actions")}</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -385,12 +387,12 @@ export function PermissionConditionsManager({
                     {condition.is_active ? (
                       <Badge variant="default" className="gap-1">
                         <CheckCircle className="h-3 w-3" />
-                        Aktiv
+                        {translate("crm.rbac.active")}
                       </Badge>
                     ) : (
                       <Badge variant="outline" className="gap-1">
                         <XCircle className="h-3 w-3" />
-                        Inaktiv
+                        {translate("crm.rbac.inactive_label")}
                       </Badge>
                     )}
                   </TableCell>
@@ -400,7 +402,7 @@ export function PermissionConditionsManager({
                         variant="ghost"
                         size="icon"
                         onClick={() => toggleConditionActive(condition)}
-                        title={condition.is_active ? "Deaktivieren" : "Aktivieren"}
+                        title={condition.is_active ? translate("crm.rbac.deactivate") : translate("crm.rbac.activate")}
                       >
                         {condition.is_active ? (
                           <XCircle className="h-4 w-4" />
@@ -438,17 +440,17 @@ export function PermissionConditionsManager({
           <DialogContent className="max-w-lg">
             <DialogHeader>
               <DialogTitle>
-                {editingCondition ? "Bedingung bearbeiten" : "Neue Bedingung"}
+                {editingCondition ? translate("crm.rbac.edit_condition") : translate("crm.rbac.create_condition")}
               </DialogTitle>
               <DialogDescription>
-                Definieren Sie eine attributbasierte Zugriffsbedingung
+                {translate("crm.rbac.condition_dialog_desc")}
               </DialogDescription>
             </DialogHeader>
 
             <div className="space-y-4 py-4">
               {!rolePermissionId && (
                 <div className="space-y-2">
-                  <Label>Berechtigung</Label>
+                  <Label>{translate("crm.rbac.permission")}</Label>
                   <Select
                     value={formData.role_permission_id?.toString() || ""}
                     onValueChange={(value) =>
@@ -456,7 +458,7 @@ export function PermissionConditionsManager({
                     }
                   >
                     <SelectTrigger>
-                      <SelectValue placeholder="Berechtigung auswählen" />
+                      <SelectValue placeholder={translate("crm.rbac.select_permission")} />
                     </SelectTrigger>
                     <SelectContent>
                       {permissions?.map((perm: RolePermission) => (
@@ -471,7 +473,7 @@ export function PermissionConditionsManager({
 
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label>Zielfeld (im Datensatz)</Label>
+                  <Label>{translate("crm.rbac.target_field")}</Label>
                   <Select
                     value={formData.target_field}
                     onValueChange={(value) =>
@@ -479,7 +481,7 @@ export function PermissionConditionsManager({
                     }
                   >
                     <SelectTrigger>
-                      <SelectValue placeholder="Feld auswählen" />
+                      <SelectValue placeholder={translate("crm.rbac.select_field")} />
                     </SelectTrigger>
                     <SelectContent>
                       {getResourceFields().map((field) => (
@@ -487,12 +489,12 @@ export function PermissionConditionsManager({
                           {field.label}
                         </SelectItem>
                       ))}
-                      <SelectItem value="_custom">Eigenes Feld...</SelectItem>
+                      <SelectItem value="_custom">{translate("crm.rbac.custom_field")}</SelectItem>
                     </SelectContent>
                   </Select>
                   {formData.target_field === "_custom" && (
                     <Input
-                      placeholder="Feldname eingeben"
+                      placeholder={translate("crm.rbac.enter_field_name")}
                       onChange={(e) =>
                         setFormData({ ...formData, target_field: e.target.value })
                       }
@@ -501,7 +503,7 @@ export function PermissionConditionsManager({
                 </div>
 
                 <div className="space-y-2">
-                  <Label>Operator</Label>
+                  <Label>{translate("crm.rbac.operator")}</Label>
                   <Select
                     value={formData.operator}
                     onValueChange={(value: ConditionOperator) =>
@@ -523,7 +525,7 @@ export function PermissionConditionsManager({
               </div>
 
               <div className="space-y-2">
-                <Label>Vergleichswert aus</Label>
+                <Label>{translate("crm.rbac.compare_from")}</Label>
                 <Select
                   value={formData.source_type}
                   onValueChange={(value: ConditionSourceType) =>
@@ -546,7 +548,7 @@ export function PermissionConditionsManager({
               {(formData.source_type === "user_attribute" ||
                 formData.source_type === "role_attribute") && (
                 <div className="space-y-2">
-                  <Label>Attribut</Label>
+                  <Label>{translate("crm.rbac.source_attribute")}</Label>
                   <Select
                     value={formData.source_attribute}
                     onValueChange={(value) =>
@@ -554,7 +556,7 @@ export function PermissionConditionsManager({
                     }
                   >
                     <SelectTrigger>
-                      <SelectValue placeholder="Attribut auswählen" />
+                      <SelectValue placeholder={translate("crm.rbac.select_attribute")} />
                     </SelectTrigger>
                     <SelectContent>
                       {attributeDefinitions
@@ -575,12 +577,12 @@ export function PermissionConditionsManager({
 
               {formData.source_type === "static_value" && (
                 <div className="space-y-2">
-                  <Label>Fester Wert</Label>
+                  <Label>{translate("crm.rbac.static_value")}</Label>
                   {formData.operator === "IN" || formData.operator === "NOT IN" ? (
                     <>
                       <div className="flex gap-2">
                         <Input
-                          placeholder="Wert hinzufügen"
+                          placeholder={translate("crm.rbac.add_value")}
                           value={newStaticValue}
                           onChange={(e) => setNewStaticValue(e.target.value)}
                           onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), addStaticValue())}
@@ -610,7 +612,7 @@ export function PermissionConditionsManager({
                       onChange={(e) =>
                         setFormData({ ...formData, source_attribute: e.target.value })
                       }
-                      placeholder="Wert eingeben"
+                      placeholder={translate("crm.rbac.enter_value")}
                     />
                   )}
                 </div>
@@ -618,7 +620,7 @@ export function PermissionConditionsManager({
 
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label>Logik-Operator</Label>
+                  <Label>{translate("crm.rbac.logic_operator")}</Label>
                   <Select
                     value={formData.logic_operator}
                     onValueChange={(value: LogicOperator) =>
@@ -629,14 +631,14 @@ export function PermissionConditionsManager({
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="AND">UND (alle Bedingungen müssen erfüllt sein)</SelectItem>
-                      <SelectItem value="OR">ODER (eine Bedingung muss erfüllt sein)</SelectItem>
+                      <SelectItem value="AND">{translate("crm.rbac.logic_and")}</SelectItem>
+                      <SelectItem value="OR">{translate("crm.rbac.logic_or")}</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
 
                 <div className="space-y-2">
-                  <Label>Status</Label>
+                  <Label>{translate("crm.rbac.condition_status")}</Label>
                   <div className="flex items-center gap-2 h-10">
                     <Switch
                       checked={formData.is_active}
@@ -645,7 +647,7 @@ export function PermissionConditionsManager({
                       }
                     />
                     <span className="text-sm">
-                      {formData.is_active ? "Aktiv" : "Inaktiv"}
+                      {formData.is_active ? translate("crm.rbac.active") : translate("crm.rbac.inactive_label")}
                     </span>
                   </div>
                 </div>
@@ -654,10 +656,10 @@ export function PermissionConditionsManager({
 
             <DialogFooter>
               <Button variant="outline" onClick={() => setIsDialogOpen(false)}>
-                Abbrechen
+                {translate("crm.cancel")}
               </Button>
               <Button onClick={handleSubmit}>
-                {editingCondition ? "Speichern" : "Erstellen"}
+                {editingCondition ? translate("crm.save") : translate("crm.create")}
               </Button>
             </DialogFooter>
           </DialogContent>
@@ -667,15 +669,14 @@ export function PermissionConditionsManager({
         <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
           <AlertDialogContent>
             <AlertDialogHeader>
-              <AlertDialogTitle>Bedingung löschen?</AlertDialogTitle>
+              <AlertDialogTitle>{translate("crm.rbac.delete_condition_title")}</AlertDialogTitle>
               <AlertDialogDescription>
-                Möchten Sie diese Bedingung wirklich löschen? Die Berechtigung wird
-                dann ohne diese zusätzliche Einschränkung angewendet.
+                {translate("crm.rbac.delete_condition_desc")}
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
-              <AlertDialogCancel>Abbrechen</AlertDialogCancel>
-              <AlertDialogAction onClick={handleDelete}>Löschen</AlertDialogAction>
+              <AlertDialogCancel>{translate("crm.cancel")}</AlertDialogCancel>
+              <AlertDialogAction onClick={handleDelete}>{translate("crm.delete")}</AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>

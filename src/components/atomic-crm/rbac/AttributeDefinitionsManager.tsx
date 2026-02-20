@@ -6,6 +6,7 @@ import {
   useDelete,
   useNotify,
   useRefresh,
+  useTranslate,
 } from "ra-core";
 import {
   Card,
@@ -79,6 +80,7 @@ export function AttributeDefinitionsManager({
 }: AttributeDefinitionsManagerProps) {
   const notify = useNotify();
   const refresh = useRefresh();
+  const translate = useTranslate();
   const [create] = useCreate();
   const [update] = useUpdate();
   const [deleteOne] = useDelete();
@@ -141,7 +143,7 @@ export function AttributeDefinitionsManager({
 
   const handleSubmit = async () => {
     if (!formData.name || !formData.label) {
-      notify("Name und Label sind erforderlich", { type: "error" });
+      notify(translate("crm.rbac.name_label_required"), { type: "error" });
       return;
     }
 
@@ -161,7 +163,7 @@ export function AttributeDefinitionsManager({
           },
           {
             onSuccess: () => {
-              notify("Attribut aktualisiert", { type: "success" });
+              notify(translate("crm.rbac.attribute_updated"), { type: "success" });
               setIsDialogOpen(false);
               resetForm();
               refresh();
@@ -174,7 +176,7 @@ export function AttributeDefinitionsManager({
           { data },
           {
             onSuccess: () => {
-              notify("Attribut erstellt", { type: "success" });
+              notify(translate("crm.rbac.attribute_created"), { type: "success" });
               setIsDialogOpen(false);
               resetForm();
               refresh();
@@ -183,7 +185,7 @@ export function AttributeDefinitionsManager({
         );
       }
     } catch (error: unknown) {
-      notify(error instanceof Error ? error.message : "Fehler beim Speichern", { type: "error" });
+      notify(error instanceof Error ? error.message : translate("crm.rbac.error_save"), { type: "error" });
     }
   };
 
@@ -196,7 +198,7 @@ export function AttributeDefinitionsManager({
         { id: attributeToDelete.id, previousData: attributeToDelete },
         {
           onSuccess: () => {
-            notify("Attribut gelöscht", { type: "success" });
+              notify(translate("crm.rbac.attribute_deleted"), { type: "success" });
             setIsDeleteDialogOpen(false);
             setAttributeToDelete(null);
             refresh();
@@ -204,7 +206,7 @@ export function AttributeDefinitionsManager({
         }
       );
     } catch (error: unknown) {
-      notify(error instanceof Error ? error.message : "Fehler beim Löschen", { type: "error" });
+      notify(error instanceof Error ? error.message : translate("crm.rbac.error_delete"), { type: "error" });
     }
   };
 
@@ -241,35 +243,35 @@ export function AttributeDefinitionsManager({
           <div>
             <CardTitle className="flex items-center gap-2">
               <Tags className="h-5 w-5" />
-              Attribut-Definitionen
+              {translate("crm.rbac.attribute_definitions")}
             </CardTitle>
             <CardDescription>
-              Definieren Sie Attribute für Benutzer und Rollen (z.B. Region, Abteilung)
+              {translate("crm.rbac.attribute_definitions_desc")}
             </CardDescription>
           </div>
           <Button onClick={openCreateDialog}>
             <Plus className="h-4 w-4 mr-2" />
-            Neues Attribut
+            {translate("crm.rbac.new_attribute")}
           </Button>
         </div>
       </CardHeader>
       <CardContent>
         {isLoading ? (
-          <div className="text-center py-4 text-muted-foreground">Laden...</div>
+          <div className="text-center py-4 text-muted-foreground">{translate("crm.rbac.loading")}</div>
         ) : !attributes?.length ? (
           <div className="text-center py-8 text-muted-foreground">
-            Keine Attribute definiert
+            {translate("crm.rbac.no_attributes")}
           </div>
         ) : (
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Name</TableHead>
-                <TableHead>Label</TableHead>
-                <TableHead>Datentyp</TableHead>
-                <TableHead>Anwendbar auf</TableHead>
-                <TableHead>System</TableHead>
-                <TableHead className="w-[100px]">Aktionen</TableHead>
+                <TableHead>{translate("crm.rbac.attribute_name")}</TableHead>
+                <TableHead>{translate("crm.rbac.attribute_label")}</TableHead>
+                <TableHead>{translate("crm.rbac.data_type")}</TableHead>
+                <TableHead>{translate("crm.rbac.applies_to")}</TableHead>
+                <TableHead>{translate("crm.rbac.system")}</TableHead>
+                <TableHead className="w-[100px]">{translate("crm.actions")}</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -287,13 +289,13 @@ export function AttributeDefinitionsManager({
                       {attr.applies_to.includes("user") && (
                         <Badge variant="secondary" className="gap-1">
                           <User className="h-3 w-3" />
-                          Benutzer
+                          {translate("crm.rbac.user")}
                         </Badge>
                       )}
                       {attr.applies_to.includes("role") && (
                         <Badge variant="secondary" className="gap-1">
                           <Shield className="h-3 w-3" />
-                          Rolle
+                          {translate("crm.rbac.role_label")}
                         </Badge>
                       )}
                     </div>
@@ -302,7 +304,7 @@ export function AttributeDefinitionsManager({
                     {attr.is_system ? (
                       <Badge variant="default">System</Badge>
                     ) : (
-                      <Badge variant="outline">Benutzerdefiniert</Badge>
+                      <Badge variant="outline">{translate("crm.rbac.user_defined")}</Badge>
                     )}
                   </TableCell>
                   <TableCell>
@@ -339,17 +341,17 @@ export function AttributeDefinitionsManager({
           <DialogContent className="max-w-lg">
             <DialogHeader>
               <DialogTitle>
-                {editingAttribute ? "Attribut bearbeiten" : "Neues Attribut"}
+                {editingAttribute ? translate("crm.rbac.edit_attribute") : translate("crm.rbac.create_attribute")}
               </DialogTitle>
               <DialogDescription>
-                Definieren Sie ein Attribut für die attributbasierte Zugriffskontrolle
+                {translate("crm.rbac.attribute_dialog_desc")}
               </DialogDescription>
             </DialogHeader>
 
             <div className="space-y-4 py-4">
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="name">Technischer Name</Label>
+                  <Label htmlFor="name">{translate("crm.rbac.technical_name")}</Label>
                   <Input
                     id="name"
                     value={formData.name}
@@ -361,7 +363,7 @@ export function AttributeDefinitionsManager({
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="label">Anzeigename</Label>
+                  <Label htmlFor="label">{translate("crm.rbac.display_name")}</Label>
                   <Input
                     id="label"
                     value={formData.label}
@@ -372,18 +374,18 @@ export function AttributeDefinitionsManager({
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="description">Beschreibung</Label>
+                <Label htmlFor="description">{translate("crm.rbac.attribute_description")}</Label>
                 <Textarea
                   id="description"
                   value={formData.description}
                   onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                  placeholder="Optionale Beschreibung"
+                  placeholder={translate("crm.rbac.description_placeholder")}
                   rows={2}
                 />
               </div>
 
               <div className="space-y-2">
-                <Label>Datentyp</Label>
+                <Label>{translate("crm.rbac.data_type")}</Label>
                 <Select
                   value={formData.data_type}
                   onValueChange={(value: AttributeDataType) =>
@@ -404,7 +406,7 @@ export function AttributeDefinitionsManager({
               </div>
 
               <div className="space-y-2">
-                <Label>Anwendbar auf</Label>
+                <Label>{translate("crm.rbac.applies_to")}</Label>
                 <div className="flex gap-4">
                   <div className="flex items-center gap-2">
                     <Switch
@@ -413,7 +415,7 @@ export function AttributeDefinitionsManager({
                     />
                     <Label className="flex items-center gap-1">
                       <User className="h-4 w-4" />
-                      Benutzer
+                      {translate("crm.rbac.user")}
                     </Label>
                   </div>
                   <div className="flex items-center gap-2">
@@ -423,7 +425,7 @@ export function AttributeDefinitionsManager({
                     />
                     <Label className="flex items-center gap-1">
                       <Shield className="h-4 w-4" />
-                      Rollen
+                      {translate("crm.rbac.roles_label")}
                     </Label>
                   </div>
                 </div>
@@ -431,10 +433,10 @@ export function AttributeDefinitionsManager({
 
               {formData.data_type === "select" && (
                 <div className="space-y-2">
-                  <Label>Erlaubte Werte</Label>
+                  <Label>{translate("crm.rbac.allowed_values")}</Label>
                   <div className="flex gap-2">
                     <Input
-                      placeholder="Wert"
+                      placeholder={translate("crm.rbac.value")}
                       value={newAllowedValue.value}
                       onChange={(e) =>
                         setNewAllowedValue({ ...newAllowedValue, value: e.target.value })
@@ -471,10 +473,10 @@ export function AttributeDefinitionsManager({
 
             <DialogFooter>
               <Button variant="outline" onClick={() => setIsDialogOpen(false)}>
-                Abbrechen
+                {translate("crm.cancel")}
               </Button>
               <Button onClick={handleSubmit}>
-                {editingAttribute ? "Speichern" : "Erstellen"}
+                {editingAttribute ? translate("crm.save") : translate("crm.create")}
               </Button>
             </DialogFooter>
           </DialogContent>
@@ -484,15 +486,14 @@ export function AttributeDefinitionsManager({
         <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
           <AlertDialogContent>
             <AlertDialogHeader>
-              <AlertDialogTitle>Attribut löschen?</AlertDialogTitle>
+              <AlertDialogTitle>{translate("crm.rbac.delete_attribute_title")}</AlertDialogTitle>
               <AlertDialogDescription>
-                Möchten Sie das Attribut "{attributeToDelete?.label}" wirklich löschen?
-                Alle zugewiesenen Werte werden ebenfalls entfernt.
+                {translate("crm.rbac.delete_attribute_desc", { label: attributeToDelete?.label })}
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
-              <AlertDialogCancel>Abbrechen</AlertDialogCancel>
-              <AlertDialogAction onClick={handleDelete}>Löschen</AlertDialogAction>
+              <AlertDialogCancel>{translate("crm.cancel")}</AlertDialogCancel>
+              <AlertDialogAction onClick={handleDelete}>{translate("crm.delete")}</AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
