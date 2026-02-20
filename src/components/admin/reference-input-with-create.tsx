@@ -60,7 +60,7 @@ export function ReferenceInputWithCreate({
   const [create] = useCreate();
   const [isCreating, setIsCreating] = useState(false);
   const [showCreateForm, setShowCreateForm] = useState(false);
-  const [newRecord, setNewRecord] = useState<Record<string, any>>({});
+  const [newRecord, setNewRecord] = useState<Record<string, unknown>>({});
   const [justCreatedId, setJustCreatedId] = useState<number | null>(null);
   
   // Lokaler State für den ausgewählten Wert - überschreibt den Parent-Wert wenn nötig
@@ -108,7 +108,7 @@ export function ReferenceInputWithCreate({
       { data: newRecord },
       {
         onSuccess: (data) => {
-          console.log("Created record:", data);
+          // Created record
           const newId = data?.id;
           if (newId) {
             // Setze lokalen State sofort
@@ -138,7 +138,7 @@ export function ReferenceInputWithCreate({
           }
           setIsCreating(false);
         },
-        onError: (error: any) => {
+        onError: (error: Error) => {
           console.error("Create error:", error);
           notify(error.message || translate("ra.notification.http_error"), {
             type: "error",
@@ -149,7 +149,7 @@ export function ReferenceInputWithCreate({
     );
   }, [newRecord, createFields, create, reference, onChange, refetch, notify, translate, label]);
 
-  const handleFieldChange = useCallback((field: string, fieldValue: any) => {
+  const handleFieldChange = useCallback((field: string, fieldValue: unknown) => {
     setNewRecord((prev) => ({ ...prev, [field]: fieldValue }));
   }, []);
 

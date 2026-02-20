@@ -22,10 +22,10 @@ export interface AuditLog {
   resource_type: string;
   resource_id: number;
   resource_name: string;
-  old_values: Record<string, any> | null;
-  new_values: Record<string, any> | null;
+  old_values: Record<string, unknown> | null;
+  new_values: Record<string, unknown> | null;
   changed_fields: string[] | null;
-  metadata: Record<string, any> | null;
+  metadata: Record<string, unknown> | null;
   batch_id: string | null;
   affected_count: number;
 }
@@ -42,7 +42,7 @@ export function useAuditLog(options: UseAuditLogOptions = {}) {
   const { resourceType, resourceId, action, userId, limit = 100 } = options;
 
   // Filter aufbauen
-  const filter: Record<string, any> = {};
+  const filter: Record<string, unknown> = {};
   if (resourceType) filter.resource_type = resourceType;
   if (resourceId) filter.resource_id = resourceId;
   if (action) filter.action = action;
@@ -75,10 +75,10 @@ export function useCreateAuditLog() {
       resourceType: string;
       resourceId?: number;
       resourceName?: string;
-      oldValues?: Record<string, any>;
-      newValues?: Record<string, any>;
+      oldValues?: Record<string, unknown>;
+      newValues?: Record<string, unknown>;
       changedFields?: string[];
-      metadata?: Record<string, any>;
+      metadata?: Record<string, unknown>;
       batchId?: string;
       affectedCount?: number;
     }) => {
@@ -98,7 +98,7 @@ export function useCreateAuditLog() {
           },
         });
         return true;
-      } catch (error: any) {
+      } catch (error: unknown) {
         console.error("Failed to create audit log:", error);
         return false;
       }
@@ -112,7 +112,7 @@ export function useCreateAuditLog() {
       resourceType: string;
       exportedIds: (number | string)[];
       exportFormat: string;
-      additionalMetadata?: Record<string, any>;
+      additionalMetadata?: Record<string, unknown>;
     }) => {
       return createAuditLog({
         action: "export",
@@ -137,11 +137,11 @@ export function useCreateAuditLog() {
 
 // Hilfsfunktion um Änderungen zwischen zwei Objekten zu finden
 export function getChangedFields(
-  oldValues: Record<string, any>,
-  newValues: Record<string, any>
-): { changedFields: string[]; changes: Record<string, { old: any; new: any }> } {
+  oldValues: Record<string, unknown>,
+  newValues: Record<string, unknown>
+): { changedFields: string[]; changes: Record<string, { old: unknown; new: unknown }> } {
   const changedFields: string[] = [];
-  const changes: Record<string, { old: any; new: any }> = {};
+  const changes: Record<string, { old: unknown; new: unknown }> = {};
 
   const allKeys = new Set([...Object.keys(oldValues), ...Object.keys(newValues)]);
 

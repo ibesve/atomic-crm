@@ -2,7 +2,8 @@ import { useTranslate, useGetList } from "ra-core";
 import { Link, useNavigate } from "react-router";
 import { ExternalLink } from "lucide-react";
 import { useMemo } from "react";
-import { EditableDataGrid, EditableColumnDef } from "@/components/admin/editable-datagrid";
+import { EditableDataGrid } from "@/components/admin/editable-datagrid";
+import type { EditableColumnDef } from "@/components/admin/editable-datagrid";
 import type { Contact, Company, Sale } from "../types";
 
 // Hilfsfunktion um die erste E-Mail aus email_jsonb zu extrahieren

@@ -176,7 +176,7 @@ export function EditableDataGrid<RecordType extends RaRecord = RaRecord>({
     return baseFilter;
   }, [filters, state.showDeleted, enableSoftDelete]);
 
-  const { data, isPending, total } = useGetList<RecordType>(resource, {
+  const { data, isPending } = useGetList<RecordType>(resource, {
     pagination: { page: 1, perPage: 100 },
     sort: state.sort,
     filter: buildFilter(),
@@ -345,7 +345,7 @@ export function EditableDataGrid<RecordType extends RaRecord = RaRecord>({
 
   // Check if record is deleted
   const isDeleted = (record: RecordType) => {
-    return enableSoftDelete && (record as any).deleted_at !== null;
+    return enableSoftDelete && (record as RecordType & { deleted_at?: string | null }).deleted_at !== null;
   };
 
   return (
@@ -684,8 +684,8 @@ export function EditableDataGrid<RecordType extends RaRecord = RaRecord>({
   );
 }
 
-function getNestedValue(obj: any, path: string): any {
-  return path.split(".").reduce((acc, part) => acc?.[part], obj);
+function getNestedValue(obj: Record<string, unknown>, path: string): unknown {
+  return path.split(".").reduce<unknown>((acc, part) => (acc as Record<string, unknown>)?.[part], obj);
 }
 
 export default EditableDataGrid;

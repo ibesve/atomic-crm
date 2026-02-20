@@ -62,13 +62,13 @@ import {
   User,
   X,
 } from "lucide-react";
-import {
+import type {
   AttributeDefinition,
   AttributeDataType,
   AttributeAppliesTo,
   AttributeAllowedValue,
-  ATTRIBUTE_DATA_TYPES,
 } from "../types/rbac";
+import { ATTRIBUTE_DATA_TYPES } from "../types/rbac";
 
 interface AttributeDefinitionsManagerProps {
   className?: string;

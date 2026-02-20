@@ -28,11 +28,12 @@ export function useSoftDelete(resource: string) {
         refresh();
         options?.onSuccess?.();
         return true;
-      } catch (error: any) {
-        notify(error.message || translate("ra.notification.http_error"), {
+      } catch (error: unknown) {
+        const _msg = error instanceof Error ? error.message : translate("ra.notification.http_error");
+        notify(_msg, {
           type: "error",
         });
-        options?.onError?.(error);
+        options?.onError?.(error instanceof Error ? error : new Error(String(error)));
         return false;
       }
     },
@@ -55,11 +56,12 @@ export function useSoftDelete(resource: string) {
         refresh();
         options?.onSuccess?.();
         return true;
-      } catch (error: any) {
-        notify(error.message || translate("ra.notification.http_error"), {
+      } catch (error: unknown) {
+        const message = error instanceof Error ? error.message : translate("ra.notification.http_error");
+        notify(message, {
           type: "error",
         });
-        options?.onError?.(error);
+        options?.onError?.(error instanceof Error ? error : new Error(String(error)));
         return false;
       }
     },
@@ -86,11 +88,12 @@ export function useSoftDelete(resource: string) {
         refresh();
         options?.onSuccess?.();
         return true;
-      } catch (error: any) {
-        notify(error.message || translate("ra.notification.http_error"), {
+      } catch (error: unknown) {
+        const _msg = error instanceof Error ? error.message : translate("ra.notification.http_error");
+        notify(_msg, {
           type: "error",
         });
-        options?.onError?.(error);
+        options?.onError?.(error instanceof Error ? error : new Error(String(error)));
         return false;
       }
     },
@@ -120,11 +123,12 @@ export function useSoftDelete(resource: string) {
         refresh();
         options?.onSuccess?.();
         return true;
-      } catch (error: any) {
-        notify(error.message || translate("ra.notification.http_error"), {
+      } catch (error: unknown) {
+        const _msg = error instanceof Error ? error.message : translate("ra.notification.http_error");
+        notify(_msg, {
           type: "error",
         });
-        options?.onError?.(error);
+        options?.onError?.(error instanceof Error ? error : new Error(String(error)));
         return false;
       }
     },

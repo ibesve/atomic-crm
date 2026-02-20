@@ -74,10 +74,10 @@ const ContactPositionInputs = () => {
     if (watchedCompanyId !== undefined && watchedCompanyId !== companyId) {
       setCompanyId(watchedCompanyId);
     }
-  }, [watchedCompanyId]);
+  }, [watchedCompanyId, companyId]);
 
   const handleCompanyChange = useCallback((value: number | string | null) => {
-    console.log("Company changed to:", value);
+    // Company changed
     setCompanyId(value as number | null);
     setValue("company_id", value, { shouldDirty: true, shouldValidate: true, shouldTouch: true });
   }, [setValue]);

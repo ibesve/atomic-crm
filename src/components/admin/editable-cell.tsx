@@ -29,7 +29,7 @@ interface EditableCellProps<RecordType extends RaRecord = RaRecord> {
   type?: "text" | "number" | "select" | "reference";
   options?: { value: string; label: string }[];
   referenceData?: RaRecord[];
-  renderDisplay?: (value: any, record: RecordType) => ReactNode;
+  renderDisplay?: (value: unknown, record: RecordType) => ReactNode;
   className?: string;
 }
 
@@ -46,8 +46,8 @@ export function EditableCell<RecordType extends RaRecord = RaRecord>({
   const record = useRecordContext<RecordType>();
   const [isEditing, setIsEditing] = useState(false);
   const [selectOpen, setSelectOpen] = useState(false);
-  const [value, setValue] = useState<any>(null);
-  const [originalValue, setOriginalValue] = useState<any>(null);
+  const [value, setValue] = useState<unknown>(null);
+  const [originalValue, setOriginalValue] = useState<unknown>(null);
   const [update, { isPending }] = useUpdate();
   const notify = useNotify();
   const refresh = useRefresh();
@@ -76,14 +76,14 @@ export function EditableCell<RecordType extends RaRecord = RaRecord>({
             setIsEditing(false);
             refresh();
           },
-          onError: (error: any) => {
-            notify(error.message || translate("ra.notification.http_error"), {
+          onError: (err: Error) => {
+            notify(err.message || translate("ra.notification.http_error"), {
               type: "error",
             });
           },
         }
       );
-    } catch (error) {
+    } catch {
       // Error handled in onError callback
     }
   }, [record, resource, source, value, originalValue, update, notify, translate, refresh]);
@@ -164,8 +164,8 @@ export function EditableCell<RecordType extends RaRecord = RaRecord>({
           setIsEditing(false);
           refresh();
         },
-        onError: (error: any) => {
-          notify(error.message || translate("ra.notification.http_error"), {
+        onError: (err: Error) => {
+          notify(err.message || translate("ra.notification.http_error"), {
             type: "error",
           });
           setIsEditing(false);
@@ -242,7 +242,7 @@ export function EditableCell<RecordType extends RaRecord = RaRecord>({
                 }
                 if (e.key === "Escape") {
                   e.preventDefault();
-                  cancelEditing(e as any);
+                  cancelEditing(e as unknown as React.MouseEvent);
                 }
               }}
             />
@@ -281,8 +281,8 @@ export function EditableCell<RecordType extends RaRecord = RaRecord>({
 }
 
 // Helper function to get nested values (e.g., "company.name")
-function getNestedValue(obj: any, path: string): any {
-  return path.split(".").reduce((acc, part) => acc?.[part], obj);
+function getNestedValue(obj: Record<string, unknown>, path: string): unknown {
+  return path.split(".").reduce<unknown>((acc, part) => (acc as Record<string, unknown>)?.[part], obj);
 }
 
 export default EditableCell;

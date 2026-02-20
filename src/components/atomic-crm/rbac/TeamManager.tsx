@@ -72,7 +72,7 @@ export const TeamManager = () => {
       setCreateDialogOpen(false);
       refetchTeams();
       notify(translate("crm.rbac.team_created"), { type: "success" });
-    } catch (error) {
+    } catch {
       notify(translate("crm.rbac.error"), { type: "error" });
     }
   };
@@ -82,7 +82,7 @@ export const TeamManager = () => {
       await dataProvider.delete("teams", { id: teamId, previousData: { id: teamId } });
       refetchTeams();
       notify(translate("crm.rbac.team_deleted"), { type: "success" });
-    } catch (error) {
+    } catch {
       notify(translate("crm.rbac.error"), { type: "error" });
     }
   };
@@ -102,7 +102,7 @@ export const TeamManager = () => {
       setSelectedSalesId("");
       refetchMembers();
       notify(translate("crm.rbac.member_added"), { type: "success" });
-    } catch (error) {
+    } catch {
       notify(translate("crm.rbac.error"), { type: "error" });
     }
   };
@@ -112,7 +112,7 @@ export const TeamManager = () => {
       await dataProvider.delete("team_members", { id: memberId, previousData: { id: memberId } });
       refetchMembers();
       notify(translate("crm.rbac.member_removed"), { type: "success" });
-    } catch (error) {
+    } catch {
       notify(translate("crm.rbac.error"), { type: "error" });
     }
   };
@@ -125,7 +125,7 @@ export const TeamManager = () => {
         previousData: member,
       });
       refetchMembers();
-    } catch (error) {
+    } catch {
       notify(translate("crm.rbac.error"), { type: "error" });
     }
   };

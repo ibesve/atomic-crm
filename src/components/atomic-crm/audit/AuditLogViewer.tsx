@@ -32,7 +32,8 @@ import {
 } from "@/components/ui/collapsible";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
-import { useAuditLog, AuditLog, AuditAction } from "@/hooks/use-audit-log";
+import { useAuditLog } from "@/hooks/use-audit-log";
+import type { AuditLog, AuditAction } from "@/hooks/use-audit-log";
 
 interface AuditLogViewerProps {
   resourceType?: string;

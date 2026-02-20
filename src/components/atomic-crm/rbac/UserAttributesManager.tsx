@@ -52,7 +52,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Plus, Pencil, Trash2, User, Tags } from "lucide-react";
-import {
+import type {
   UserAttribute,
   AttributeDefinition,
 } from "../types/rbac";

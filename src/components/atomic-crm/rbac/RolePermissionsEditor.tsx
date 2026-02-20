@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useTranslate, useDataProvider, useNotify } from "ra-core";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -50,11 +50,7 @@ export const RolePermissionsEditor = ({ roleId }: { roleId: number }) => {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
-  useEffect(() => {
-    loadPermissions();
-  }, [roleId]);
-
-  const loadPermissions = async () => {
+  const loadPermissions = useCallback(async () => {
     setLoading(true);
     try {
       const { data } = await dataProvider.getList<RolePermission>('role_permissions', {
@@ -78,11 +74,15 @@ export const RolePermissionsEditor = ({ roleId }: { roleId: number }) => {
       });
 
       setPermissions(matrix);
-    } catch (error) {
+    } catch {
       notify('crm.rbac.load_error', { type: 'error' });
     }
     setLoading(false);
-  };
+  }, [dataProvider, roleId, notify]);
+
+  useEffect(() => {
+    loadPermissions();
+  }, [loadPermissions]);
 
   const handleScopeChange = (resource: string, action: string, scope: PermissionScope) => {
     setPermissions(prev => ({
@@ -126,7 +126,7 @@ export const RolePermissionsEditor = ({ roleId }: { roleId: number }) => {
       }
 
       notify(translate('crm.rbac.saved'), { type: 'success' });
-    } catch (error) {
+    } catch {
       notify(translate('crm.rbac.save_error'), { type: 'error' });
     }
     setSaving(false);

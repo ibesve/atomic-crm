@@ -60,7 +60,7 @@ import {
   CheckCircle,
   XCircle,
 } from "lucide-react";
-import {
+import type {
   PermissionCondition,
   RolePermission,
   AttributeDefinition,
@@ -69,6 +69,8 @@ import {
   ConditionType,
   LogicOperator,
   ResourceType,
+} from "../types/rbac";
+import {
   CONDITION_OPERATORS,
   SOURCE_TYPES,
   RESOURCE_FIELDS,
