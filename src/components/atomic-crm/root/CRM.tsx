@@ -191,29 +191,30 @@ const LazyMobileDashboard = () => (
   </SuspenseWrapper>
 );
 
-const MobileAdmin = (props: CoreAdminProps) => {
-  const queryClient = new QueryClient({
-    defaultOptions: {
-      queries: {
-        gcTime: 1000 * 60 * 60 * 24, // 24 hours
-        networkMode: "offlineFirst",
-      },
-      mutations: {
-        networkMode: "offlineFirst",
-      },
+const mobileQueryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      gcTime: 1000 * 60 * 60 * 24, // 24 hours
+      networkMode: "offlineFirst",
     },
-  });
-  const asyncStoragePersister = createAsyncStoragePersister({
-    storage: localStorage,
-  });
+    mutations: {
+      networkMode: "offlineFirst",
+    },
+  },
+});
 
+const mobileAsyncStoragePersister = createAsyncStoragePersister({
+  storage: localStorage,
+});
+
+const MobileAdmin = (props: CoreAdminProps) => {
   return (
     <PersistQueryClientProvider
-      client={queryClient}
-      persistOptions={{ persister: asyncStoragePersister }}
+      client={mobileQueryClient}
+      persistOptions={{ persister: mobileAsyncStoragePersister }}
     >
       <Admin
-        queryClient={queryClient}
+        queryClient={mobileQueryClient}
         layout={MobileLayout}
         dashboard={LazyMobileDashboard}
         {...props}

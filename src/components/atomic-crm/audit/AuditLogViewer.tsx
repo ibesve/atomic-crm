@@ -347,7 +347,7 @@ function AuditLogEntry({
 }
 
 interface ChangeValuesProps {
-  values: Record<string, any>;
+  values: Record<string, unknown>;
   changedFields: string[];
 }
 
@@ -380,7 +380,7 @@ function ChangeValues({ values, changedFields }: ChangeValuesProps) {
   );
 }
 
-function formatValue(value: any): string {
+function formatValue(value: unknown): string {
   if (value === null || value === undefined) return "-";
   if (typeof value === "boolean") return value ? "Ja" : "Nein";
   if (typeof value === "object") return JSON.stringify(value);

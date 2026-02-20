@@ -47,7 +47,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { cn } from "@/lib/utils";
+import { cn, getNestedValue } from "@/lib/utils";
 import { EditableCell } from "./editable-cell";
 import { useSoftDelete } from "@/hooks/use-soft-delete";
 
@@ -114,8 +114,8 @@ export function EditableDataGrid<RecordType extends RaRecord = RaRecord>({
           showDeleted: parsed.showDeleted || false,
         };
       }
-    } catch (e) {
-      console.error("Error loading datagrid state:", e);
+    } catch {
+      // Silently ignore localStorage errors
     }
     return {
       columnOrder: columns.map(c => c.source),
@@ -157,8 +157,8 @@ export function EditableDataGrid<RecordType extends RaRecord = RaRecord>({
   useEffect(() => {
     try {
       localStorage.setItem(storageKey, JSON.stringify(state));
-    } catch (e) {
-      console.error("Error saving datagrid state:", e);
+    } catch {
+      // Silently ignore localStorage errors
     }
   }, [state, storageKey]);
 
@@ -682,10 +682,6 @@ export function EditableDataGrid<RecordType extends RaRecord = RaRecord>({
       </Dialog>
     </Card>
   );
-}
-
-function getNestedValue(obj: Record<string, unknown>, path: string): unknown {
-  return path.split(".").reduce<unknown>((acc, part) => (acc as Record<string, unknown>)?.[part], obj);
 }
 
 export default EditableDataGrid;

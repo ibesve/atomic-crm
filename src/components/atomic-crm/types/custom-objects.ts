@@ -86,7 +86,7 @@ export interface CustomObjectData {
   created_at: string;
   updated_at: string;
   object_definition_id: number;
-  data: Record<string, any>;
+  data: Record<string, unknown>;
   sales_id: number | null;
   deleted_at: string | null;
 }
@@ -99,7 +99,7 @@ export interface CustomFieldValue {
   contact_id: number | null;
   company_id: number | null;
   deal_id: number | null;
-  value: any;
+  value: unknown;
 }
 
 export interface ObjectRelationship {
@@ -110,7 +110,7 @@ export interface ObjectRelationship {
   target_type: string;
   target_id: number;
   relationship_type: string | null;
-  metadata: Record<string, any> | null;
+  metadata: Record<string, unknown> | null;
 }
 
 // Formular-Typen für UI

@@ -156,8 +156,8 @@ export function CustomObjectsManager() {
       setIsCreateDialogOpen(false);
       resetForm();
       refresh();
-    } catch (error: any) {
-      notify(error.message || "Fehler beim Erstellen", { type: "error" });
+    } catch (error: unknown) {
+      notify(error instanceof Error ? error.message : "Fehler beim Erstellen", { type: "error" });
     }
   };
 
@@ -177,8 +177,8 @@ export function CustomObjectsManager() {
       setEditingObject(null);
       resetForm();
       refresh();
-    } catch (error: any) {
-      notify(error.message || "Fehler beim Aktualisieren", { type: "error" });
+    } catch (error: unknown) {
+      notify(error instanceof Error ? error.message : "Fehler beim Aktualisieren", { type: "error" });
     }
   };
 
@@ -196,8 +196,8 @@ export function CustomObjectsManager() {
       }
       setDeleteConfirmObject(null);
       refresh();
-    } catch (error: any) {
-      notify(error.message || "Fehler beim Löschen", { type: "error" });
+    } catch (error: unknown) {
+      notify(error instanceof Error ? error.message : "Fehler beim Löschen", { type: "error" });
     }
   };
 

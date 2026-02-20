@@ -18,7 +18,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { TableCell } from "@/components/ui/table";
-import { cn } from "@/lib/utils";
+import { cn, getNestedValue } from "@/lib/utils";
 
 const EMPTY_VALUE = "__none__";
 
@@ -129,8 +129,8 @@ export function EditableCell<RecordType extends RaRecord = RaRecord>({
     [record, source, type]
   );
 
-  const cancelEditing = useCallback((e: React.MouseEvent) => {
-    e.stopPropagation();
+  const cancelEditing = useCallback((e?: { stopPropagation?: () => void }) => {
+    e?.stopPropagation?.();
     setIsEditing(false);
     setSelectOpen(false);
     setValue(originalValue);
@@ -242,7 +242,7 @@ export function EditableCell<RecordType extends RaRecord = RaRecord>({
                 }
                 if (e.key === "Escape") {
                   e.preventDefault();
-                  cancelEditing(e as unknown as React.MouseEvent);
+                  cancelEditing(e);
                 }
               }}
             />
@@ -278,11 +278,6 @@ export function EditableCell<RecordType extends RaRecord = RaRecord>({
       </div>
     </TableCell>
   );
-}
-
-// Helper function to get nested values (e.g., "company.name")
-function getNestedValue(obj: Record<string, unknown>, path: string): unknown {
-  return path.split(".").reduce<unknown>((acc, part) => (acc as Record<string, unknown>)?.[part], obj);
 }
 
 export default EditableCell;

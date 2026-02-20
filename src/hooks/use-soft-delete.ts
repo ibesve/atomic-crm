@@ -12,16 +12,27 @@ export function useSoftDelete(resource: string) {
   const refresh = useRefresh();
   const translate = useTranslate();
 
+  const handleError = useCallback(
+    (error: unknown, options?: SoftDeleteOptions) => {
+      const err = error instanceof Error ? error : new Error(String(error));
+      notify(err.message || translate("ra.notification.http_error"), {
+        type: "error",
+      });
+      options?.onError?.(err);
+    },
+    [notify, translate]
+  );
+
+  const updateRecord = useCallback(
+    (id: number | string, data: Record<string, unknown>) =>
+      dataProvider.update(resource, { id, data, previousData: { id } }),
+    [dataProvider, resource]
+  );
+
   const softDelete = useCallback(
     async (id: number | string, options?: SoftDeleteOptions) => {
       try {
-        // Setze deleted_at statt echtem Delete
-        await dataProvider.update(resource, {
-          id,
-          data: { deleted_at: new Date().toISOString() },
-          previousData: { id },
-        });
-
+        await updateRecord(id, { deleted_at: new Date().toISOString() });
         notify(translate("ra.notification.deleted", { smart_count: 1 }), {
           type: "success",
         });
@@ -29,26 +40,17 @@ export function useSoftDelete(resource: string) {
         options?.onSuccess?.();
         return true;
       } catch (error: unknown) {
-        const _msg = error instanceof Error ? error.message : translate("ra.notification.http_error");
-        notify(_msg, {
-          type: "error",
-        });
-        options?.onError?.(error instanceof Error ? error : new Error(String(error)));
+        handleError(error, options);
         return false;
       }
     },
-    [dataProvider, resource, notify, translate, refresh]
+    [updateRecord, notify, translate, refresh, handleError]
   );
 
   const restore = useCallback(
     async (id: number | string, options?: SoftDeleteOptions) => {
       try {
-        await dataProvider.update(resource, {
-          id,
-          data: { deleted_at: null },
-          previousData: { id },
-        });
-
+        await updateRecord(id, { deleted_at: null });
         notify(
           translate("crm.soft_delete.restored", { _: "Eintrag wiederhergestellt" }),
           { type: "success" }
@@ -57,15 +59,11 @@ export function useSoftDelete(resource: string) {
         options?.onSuccess?.();
         return true;
       } catch (error: unknown) {
-        const message = error instanceof Error ? error.message : translate("ra.notification.http_error");
-        notify(message, {
-          type: "error",
-        });
-        options?.onError?.(error instanceof Error ? error : new Error(String(error)));
+        handleError(error, options);
         return false;
       }
     },
-    [dataProvider, resource, notify, translate, refresh]
+    [updateRecord, notify, translate, refresh, handleError]
   );
 
   const bulkSoftDelete = useCallback(
@@ -73,14 +71,9 @@ export function useSoftDelete(resource: string) {
       try {
         await Promise.all(
           ids.map((id) =>
-            dataProvider.update(resource, {
-              id,
-              data: { deleted_at: new Date().toISOString() },
-              previousData: { id },
-            })
+            updateRecord(id, { deleted_at: new Date().toISOString() })
           )
         );
-
         notify(
           translate("ra.notification.deleted", { smart_count: ids.length }),
           { type: "success" }
@@ -89,30 +82,19 @@ export function useSoftDelete(resource: string) {
         options?.onSuccess?.();
         return true;
       } catch (error: unknown) {
-        const _msg = error instanceof Error ? error.message : translate("ra.notification.http_error");
-        notify(_msg, {
-          type: "error",
-        });
-        options?.onError?.(error instanceof Error ? error : new Error(String(error)));
+        handleError(error, options);
         return false;
       }
     },
-    [dataProvider, resource, notify, translate, refresh]
+    [updateRecord, notify, translate, refresh, handleError]
   );
 
   const bulkRestore = useCallback(
     async (ids: (number | string)[], options?: SoftDeleteOptions) => {
       try {
         await Promise.all(
-          ids.map((id) =>
-            dataProvider.update(resource, {
-              id,
-              data: { deleted_at: null },
-              previousData: { id },
-            })
-          )
+          ids.map((id) => updateRecord(id, { deleted_at: null }))
         );
-
         notify(
           translate("crm.soft_delete.restored_count", {
             _: `${ids.length} Einträge wiederhergestellt`,
@@ -124,15 +106,11 @@ export function useSoftDelete(resource: string) {
         options?.onSuccess?.();
         return true;
       } catch (error: unknown) {
-        const _msg = error instanceof Error ? error.message : translate("ra.notification.http_error");
-        notify(_msg, {
-          type: "error",
-        });
-        options?.onError?.(error instanceof Error ? error : new Error(String(error)));
+        handleError(error, options);
         return false;
       }
     },
-    [dataProvider, resource, notify, translate, refresh]
+    [updateRecord, notify, translate, refresh, handleError]
   );
 
   return {

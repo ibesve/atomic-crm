@@ -87,7 +87,7 @@ export const AdminSettingsPage = () => {
   // Rolle erstellen
   const handleCreateRole = async () => {
     if (!roleForm.name.trim()) {
-      notify("Bitte geben Sie einen Namen ein", { type: "error" });
+      notify(translate("crm.admin.name_required"), { type: "error" });
       return;
     }
     
@@ -98,19 +98,19 @@ export const AdminSettingsPage = () => {
           description: roleForm.description.trim() || null 
         } 
       });
-      notify("Rolle erstellt", { type: "success" });
+      notify(translate("crm.admin.role_created"), { type: "success" });
       setIsCreateDialogOpen(false);
       setRoleForm({ name: "", description: "" });
       refresh();
-    } catch (error: any) {
-      notify(error.message || "Fehler beim Erstellen", { type: "error" });
+    } catch (error: unknown) {
+      notify(error instanceof Error ? error.message : translate("crm.admin.error_create"), { type: "error" });
     }
   };
 
   // Rolle bearbeiten
   const handleUpdateRole = async () => {
     if (!editingRole || !roleForm.name.trim()) {
-      notify("Bitte geben Sie einen Namen ein", { type: "error" });
+      notify(translate("crm.admin.name_required"), { type: "error" });
       return;
     }
     
@@ -123,12 +123,12 @@ export const AdminSettingsPage = () => {
         },
         previousData: editingRole
       });
-      notify("Rolle aktualisiert", { type: "success" });
+      notify(translate("crm.admin.role_updated"), { type: "success" });
       setEditingRole(null);
       setRoleForm({ name: "", description: "" });
       refresh();
-    } catch (error: any) {
-      notify(error.message || "Fehler beim Aktualisieren", { type: "error" });
+    } catch (error: unknown) {
+      notify(error instanceof Error ? error.message : translate("crm.admin.error_update"), { type: "error" });
     }
   };
 
@@ -138,14 +138,14 @@ export const AdminSettingsPage = () => {
     
     try {
       await deleteOne("roles", { id: deleteConfirmRole.id, previousData: deleteConfirmRole });
-      notify("Rolle gelöscht", { type: "success" });
+      notify(translate("crm.admin.role_deleted"), { type: "success" });
       if (selectedRoleId === deleteConfirmRole.id) {
         setSelectedRoleId(null);
       }
       setDeleteConfirmRole(null);
       refresh();
-    } catch (error: any) {
-      notify(error.message || "Fehler beim Löschen", { type: "error" });
+    } catch (error: unknown) {
+      notify(error instanceof Error ? error.message : translate("crm.admin.error_delete"), { type: "error" });
     }
   };
 
@@ -222,19 +222,19 @@ export const AdminSettingsPage = () => {
                     }}
                   >
                     <Plus className="w-4 h-4 mr-1" />
-                    Neu
+                    {translate("crm.admin.new", { _: "Neu" })}
                   </Button>
                 </div>
               </CardHeader>
               <CardContent>
                 {isLoading ? (
                   <div className="text-center py-8 text-muted-foreground">
-                    Lade...
+                    {translate("crm.admin.loading", { _: "Lade..." })}
                   </div>
                 ) : roles?.length === 0 ? (
                   <div className="text-center py-8 text-muted-foreground">
                     <Shield className="w-12 h-12 mx-auto mb-2 opacity-50" />
-                    <p>Keine Rollen vorhanden</p>
+                    <p>{translate("crm.admin.no_roles", { _: "Keine Rollen vorhanden" })}</p>
                   </div>
                 ) : (
                   <div className="space-y-2">
@@ -335,13 +335,13 @@ export const AdminSettingsPage = () => {
               </CardHeader>
               <CardContent>
                 <p className="text-sm text-muted-foreground mb-4">
-                  Fügen Sie benutzerdefinierte Felder zu Kontakten, Unternehmen oder Deals hinzu.
+                  {translate("crm.custom_fields.for_entities_desc")}
                 </p>
                 <Tabs value={selectedEntityType} onValueChange={(v) => setSelectedEntityType(v as typeof selectedEntityType)}>
                   <TabsList className="mb-4">
-                    <TabsTrigger value="contacts">Kontakte</TabsTrigger>
-                    <TabsTrigger value="companies">Unternehmen</TabsTrigger>
-                    <TabsTrigger value="deals">Deals</TabsTrigger>
+                    <TabsTrigger value="contacts">{translate("crm.custom_fields.contacts")}</TabsTrigger>
+                    <TabsTrigger value="companies">{translate("crm.custom_fields.companies")}</TabsTrigger>
+                    <TabsTrigger value="deals">{translate("crm.custom_fields.deals")}</TabsTrigger>
                   </TabsList>
                   <TabsContent value="contacts">
                     <CustomFieldsManager entityType="contacts" />
@@ -371,37 +371,37 @@ export const AdminSettingsPage = () => {
       <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Neue Rolle erstellen</DialogTitle>
+            <DialogTitle>{translate("crm.admin.create_role")}</DialogTitle>
             <DialogDescription>
-              Erstellen Sie eine neue Rolle und weisen Sie ihr anschließend Berechtigungen zu.
+              {translate("crm.admin.create_role_desc")}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="space-y-2">
-              <label className="text-sm font-medium">Name *</label>
+              <label className="text-sm font-medium">{translate("crm.admin.name")} *</label>
               <Input
                 value={roleForm.name}
                 onChange={(e) => setRoleForm(prev => ({ ...prev, name: e.target.value }))}
-                placeholder="z.B. Vertriebsmitarbeiter"
+                placeholder={translate("crm.admin.name_placeholder")}
               />
             </div>
             <div className="space-y-2">
-              <label className="text-sm font-medium">Beschreibung</label>
+              <label className="text-sm font-medium">{translate("crm.admin.description")}</label>
               <Textarea
                 value={roleForm.description}
                 onChange={(e) => setRoleForm(prev => ({ ...prev, description: e.target.value }))}
-                placeholder="Optionale Beschreibung der Rolle..."
+                placeholder={translate("crm.admin.description_placeholder")}
                 rows={3}
               />
             </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setIsCreateDialogOpen(false)}>
-              Abbrechen
+              {translate("ra.action.cancel")}
             </Button>
             <Button onClick={handleCreateRole}>
               <Save className="w-4 h-4 mr-2" />
-              Erstellen
+              {translate("ra.action.create")}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -411,37 +411,37 @@ export const AdminSettingsPage = () => {
       <Dialog open={!!editingRole} onOpenChange={(open) => !open && setEditingRole(null)}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Rolle bearbeiten</DialogTitle>
+            <DialogTitle>{translate("crm.admin.edit_role")}</DialogTitle>
             <DialogDescription>
-              Ändern Sie den Namen und die Beschreibung der Rolle.
+              {translate("crm.admin.edit_role_desc")}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="space-y-2">
-              <label className="text-sm font-medium">Name *</label>
+              <label className="text-sm font-medium">{translate("crm.admin.name")} *</label>
               <Input
                 value={roleForm.name}
                 onChange={(e) => setRoleForm(prev => ({ ...prev, name: e.target.value }))}
-                placeholder="z.B. Vertriebsmitarbeiter"
+                placeholder={translate("crm.admin.name_placeholder")}
               />
             </div>
             <div className="space-y-2">
-              <label className="text-sm font-medium">Beschreibung</label>
+              <label className="text-sm font-medium">{translate("crm.admin.description")}</label>
               <Textarea
                 value={roleForm.description}
                 onChange={(e) => setRoleForm(prev => ({ ...prev, description: e.target.value }))}
-                placeholder="Optionale Beschreibung der Rolle..."
+                placeholder={translate("crm.admin.description_placeholder")}
                 rows={3}
               />
             </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setEditingRole(null)}>
-              Abbrechen
+              {translate("ra.action.cancel")}
             </Button>
             <Button onClick={handleUpdateRole}>
               <Save className="w-4 h-4 mr-2" />
-              Speichern
+              {translate("ra.action.save")}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -451,20 +451,18 @@ export const AdminSettingsPage = () => {
       <AlertDialog open={!!deleteConfirmRole} onOpenChange={(open) => !open && setDeleteConfirmRole(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Rolle löschen?</AlertDialogTitle>
+            <AlertDialogTitle>{translate("crm.admin.delete_role")}</AlertDialogTitle>
             <AlertDialogDescription>
-              Möchten Sie die Rolle "{deleteConfirmRole?.name}" wirklich löschen? 
-              Alle zugewiesenen Berechtigungen werden ebenfalls entfernt.
-              Diese Aktion kann nicht rückgängig gemacht werden.
+              {translate("crm.admin.delete_role_desc", { name: deleteConfirmRole?.name })}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Abbrechen</AlertDialogCancel>
+            <AlertDialogCancel>{translate("ra.action.cancel")}</AlertDialogCancel>
             <AlertDialogAction 
               onClick={handleDeleteRole}
               className="bg-red-600 hover:bg-red-700"
             >
-              Löschen
+              {translate("ra.action.delete")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

@@ -132,7 +132,7 @@ export function CustomFieldsManager({
   const [newOption, setNewOption] = useState("");
 
   // Filter basierend auf customObjectId oder entityType
-  const filter: Record<string, any> = { "deleted_at@is": "null" };
+  const filter: Record<string, unknown> = { "deleted_at@is": "null" };
   if (customObjectId) {
     filter.custom_object_id = customObjectId;
   } else if (entityType) {
@@ -202,7 +202,7 @@ export function CustomFieldsManager({
       return;
     }
 
-    const data: any = {
+    const data: Record<string, unknown> = {
       ...formData,
       custom_object_id: customObjectId || null,
       entity_type: entityType || null,
@@ -225,8 +225,8 @@ export function CustomFieldsManager({
       setIsCreateDialogOpen(false);
       resetForm();
       refresh();
-    } catch (error: any) {
-      notify(error.message || "Fehler beim Erstellen", { type: "error" });
+    } catch (error: unknown) {
+      notify(error instanceof Error ? error.message : "Fehler beim Erstellen", { type: "error" });
     }
   };
 
@@ -236,7 +236,7 @@ export function CustomFieldsManager({
       return;
     }
 
-    const data: any = { ...formData };
+    const data: Record<string, unknown> = { ...formData };
 
     // Leere Felder bereinigen
     if (!data.options?.length) data.options = null;
@@ -258,8 +258,8 @@ export function CustomFieldsManager({
       setEditingField(null);
       resetForm();
       refresh();
-    } catch (error: any) {
-      notify(error.message || "Fehler beim Aktualisieren", { type: "error" });
+    } catch (error: unknown) {
+      notify(error instanceof Error ? error.message : "Fehler beim Aktualisieren", { type: "error" });
     }
   };
 
@@ -276,8 +276,8 @@ export function CustomFieldsManager({
       notify("Feld gelöscht", { type: "success" });
       setDeleteConfirmField(null);
       refresh();
-    } catch (error: any) {
-      notify(error.message || "Fehler beim Löschen", { type: "error" });
+    } catch (error: unknown) {
+      notify(error instanceof Error ? error.message : "Fehler beim Löschen", { type: "error" });
     }
   };
 

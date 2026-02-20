@@ -98,8 +98,8 @@ export function useCreateAuditLog() {
           },
         });
         return true;
-      } catch (error: unknown) {
-        console.error("Failed to create audit log:", error);
+      } catch {
+        // Audit log creation failure should not block the main operation
         return false;
       }
     },

@@ -97,33 +97,37 @@ export const RolePermissionsEditor = ({ roleId }: { roleId: number }) => {
   const savePermissions = async () => {
     setSaving(true);
     try {
-      // Lösche alle bestehenden Berechtigungen für diese Rolle
+      // Delete all existing permissions for this role
       const { data: existing } = await dataProvider.getList<RolePermission>('role_permissions', {
         pagination: { page: 1, perPage: 1000 },
         sort: { field: 'id', order: 'ASC' },
         filter: { role_id: roleId },
       });
 
-      for (const perm of existing) {
-        await dataProvider.delete('role_permissions', { id: perm.id, previousData: perm });
-      }
+      // Batch delete all existing permissions
+      await Promise.all(
+        existing.map((perm) =>
+          dataProvider.delete('role_permissions', { id: perm.id, previousData: perm })
+        )
+      );
 
-      // Erstelle neue Berechtigungen
+      // Collect all new permissions to create
+      const permissionsToCreate: Array<{ role_id: number; resource: string; action: string; scope: string }> = [];
       for (const resource of RESOURCES) {
         for (const action of ACTIONS) {
           const scope = permissions[resource]?.[action];
           if (scope && scope !== 'none') {
-            await dataProvider.create('role_permissions', {
-              data: {
-                role_id: roleId,
-                resource,
-                action,
-                scope,
-              },
-            });
+            permissionsToCreate.push({ role_id: roleId, resource, action, scope });
           }
         }
       }
+
+      // Batch create all new permissions
+      await Promise.all(
+        permissionsToCreate.map((data) =>
+          dataProvider.create('role_permissions', { data })
+        )
+      );
 
       notify(translate('crm.rbac.saved'), { type: 'success' });
     } catch {

@@ -95,7 +95,7 @@ export function ReferenceInputWithCreate({
 
     if (missingFields.length > 0) {
       notify(
-        `Pflichtfelder fehlen: ${missingFields.join(", ")}`,
+        translate("crm.reference_input.required_missing", { fields: missingFields.join(", ") }),
         { type: "error" }
       );
       return;
@@ -111,35 +111,23 @@ export function ReferenceInputWithCreate({
           // Created record
           const newId = data?.id;
           if (newId) {
-            // Setze lokalen State sofort
             setLocalValue(newId);
             setJustCreatedId(newId);
-            
-            // Schließe das Formular
             setShowCreateForm(false);
             setNewRecord({});
             
-            // Lade die Liste neu und setze dann den Parent-Wert
+            // Refetch the list, then notify the parent
             refetch().then(() => {
-              // Mehrfach onChange aufrufen um sicherzustellen dass es ankommt
               onChange(newId);
-              // Nochmal nach kurzer Verzögerung
-              setTimeout(() => {
-                onChange(newId);
-              }, 100);
             });
             
-            // Setze Parent-Wert sofort
-            onChange(newId);
-            
-            notify(`${label} erfolgreich erstellt und ausgewählt`, {
+            notify(translate("crm.reference_input.created_selected", { label }), {
               type: "success",
             });
           }
           setIsCreating(false);
         },
         onError: (error: Error) => {
-          console.error("Create error:", error);
           notify(error.message || translate("ra.notification.http_error"), {
             type: "error",
           });
@@ -207,7 +195,7 @@ export function ReferenceInputWithCreate({
       {justCreatedId && !showCreateForm && (
         <p className="text-xs text-green-600 flex items-center gap-1">
           <Check className="h-3 w-3" />
-          Neu erstellt und ausgewählt
+          {translate("crm.reference_input.just_created")}
         </p>
       )}
 
@@ -290,7 +278,7 @@ export function ReferenceInputWithCreate({
                 disabled={isCreating}
               >
                 {isCreating && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-                {isCreating ? "Erstelle..." : "Erstellen & Auswählen"}
+                {isCreating ? translate("crm.reference_input.creating") : translate("crm.reference_input.create_select")}
               </Button>
             </div>
           </div>

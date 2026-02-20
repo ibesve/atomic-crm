@@ -182,8 +182,8 @@ export function AttributeDefinitionsManager({
           }
         );
       }
-    } catch (error: any) {
-      notify(error.message || "Fehler beim Speichern", { type: "error" });
+    } catch (error: unknown) {
+      notify(error instanceof Error ? error.message : "Fehler beim Speichern", { type: "error" });
     }
   };
 
@@ -203,8 +203,8 @@ export function AttributeDefinitionsManager({
           },
         }
       );
-    } catch (error: any) {
-      notify(error.message || "Fehler beim Löschen", { type: "error" });
+    } catch (error: unknown) {
+      notify(error instanceof Error ? error.message : "Fehler beim Löschen", { type: "error" });
     }
   };
 
