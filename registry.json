@@ -660,11 +660,31 @@
           "type": "registry:component"
         },
         {
+          "path": "src/components/atomic-crm/custom-objects/useCustomFieldColumns.ts",
+          "type": "registry:component"
+        },
+        {
           "path": "src/components/atomic-crm/custom-objects/index.ts",
           "type": "registry:component"
         },
         {
+          "path": "src/components/atomic-crm/custom-objects/TransitiveRelationshipPicker.tsx",
+          "type": "registry:component"
+        },
+        {
+          "path": "src/components/atomic-crm/custom-objects/RelationshipManager.tsx",
+          "type": "registry:component"
+        },
+        {
+          "path": "src/components/atomic-crm/custom-objects/RelationshipDefinitionManager.tsx",
+          "type": "registry:component"
+        },
+        {
           "path": "src/components/atomic-crm/custom-objects/CustomObjectsManager.tsx",
+          "type": "registry:component"
+        },
+        {
+          "path": "src/components/atomic-crm/custom-objects/CustomFieldsSection.tsx",
           "type": "registry:component"
         },
         {
@@ -800,7 +820,15 @@
           "type": "registry:component"
         },
         {
+          "path": "src/components/atomic-crm/companies/CompanyEditSheet.tsx",
+          "type": "registry:component"
+        },
+        {
           "path": "src/components/atomic-crm/companies/CompanyEdit.tsx",
+          "type": "registry:component"
+        },
+        {
+          "path": "src/components/atomic-crm/companies/CompanyDataGrid.tsx",
           "type": "registry:component"
         },
         {
