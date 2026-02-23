@@ -5,12 +5,15 @@ import { Task } from "./Task";
 
 export const TasksIterator = ({
   showContact,
+  showAssignee = false,
   className,
 }: {
   showContact?: boolean;
+  showAssignee?: boolean;
   className?: string;
 }) => {
   const { data, error, isPending } = useListContext();
+
   if (isPending || error || data.length === 0) return null;
 
   // Keep only tasks that are not done or done less than 5 minutes ago
@@ -23,7 +26,12 @@ export const TasksIterator = ({
   return (
     <div className={`space-y-4 md:space-y-2 ${className || ""}`}>
       {tasks.map((task) => (
-        <Task task={task} showContact={showContact} key={task.id} />
+        <Task 
+          task={task} 
+          showContact={showContact} 
+          showAssignee={showAssignee}
+          key={task.id} 
+        />
       ))}
     </div>
   );

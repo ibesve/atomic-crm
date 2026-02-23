@@ -6,7 +6,7 @@ import {
   type AuthProvider,
   type DataProvider,
 } from "ra-core";
-import { useEffect } from "react";
+import { useEffect, lazy, Suspense } from "react";
 import { Route } from "react-router";
 import { QueryClient } from "@tanstack/react-query";
 import { PersistQueryClientProvider } from "@tanstack/react-query-persist-client";
@@ -15,23 +15,34 @@ import { Admin } from "@/components/admin/admin";
 import { ForgotPasswordPage } from "@/components/supabase/forgot-password-page";
 import { SetPasswordPage } from "@/components/supabase/set-password-page";
 import { OAuthConsentPage } from "@/components/supabase/oauth-consent-page";
+import { PageLoading } from "@/components/ui/loading-spinner";
+
+// Lazy loaded components
+const Dashboard = lazy(() => import("../dashboard/Dashboard").then(m => ({ default: m.Dashboard })));
+const MobileDashboard = lazy(() => import("../dashboard/MobileDashboard").then(m => ({ default: m.MobileDashboard })));
+const SettingsPage = lazy(() => import("../settings/SettingsPage").then(m => ({ default: m.SettingsPage })));
+const ImportPage = lazy(() => import("../misc/ImportPage").then(m => ({ default: m.ImportPage })));
+const ContactDataGrid = lazy(() => import("../contacts/ContactDataGrid").then(m => ({ default: m.ContactDataGrid })));
+const CompanyDataGrid = lazy(() => import("../companies/CompanyDataGrid").then(m => ({ default: m.CompanyDataGrid })));
+const ContactShow = lazy(() => import("../contacts/ContactShow").then(m => ({ default: m.ContactShow })));
+const CompanyShow = lazy(() => import("../companies/CompanyShow").then(m => ({ default: m.CompanyShow })));
+const NoteShowPage = lazy(() => import("../notes/NoteShowPage").then(m => ({ default: m.NoteShowPage })));
+const MobileTasksList = lazy(() => import("../tasks/MobileTasksList").then(m => ({ default: m.MobileTasksList })));
+const ContactListMobile = lazy(() => import("../contacts/ContactList").then(m => ({ default: m.ContactListMobile })));
+const AdminSettingsPage = lazy(() => import("../admin/AdminSettingsPage").then(m => ({ default: m.AdminSettingsPage })));
 
 import companies from "../companies";
 import contacts from "../contacts";
-import { Dashboard } from "../dashboard/Dashboard";
-import { MobileDashboard } from "../dashboard/MobileDashboard";
 import deals from "../deals";
 import { Layout } from "../layout/Layout";
 import { MobileLayout } from "../layout/MobileLayout";
 import { SignupPage } from "../login/SignupPage";
 import { ConfirmationRequired } from "../login/ConfirmationRequired";
-import { ImportPage } from "../misc/ImportPage";
 import {
   authProvider as defaultAuthProvider,
   dataProvider as defaultDataProvider,
 } from "../providers/supabase";
 import sales from "../sales";
-import { SettingsPage } from "../settings/SettingsPage";
 import type { ConfigurationContextValue } from "./ConfigurationContext";
 import { ConfigurationProvider } from "./ConfigurationContext";
 import {
@@ -49,11 +60,13 @@ import {
 import { i18nProvider } from "./i18nProvider";
 import { StartPage } from "../login/StartPage.tsx";
 import { useIsMobile } from "@/hooks/use-mobile.ts";
-import { MobileTasksList } from "../tasks/MobileTasksList.tsx";
-import { ContactListMobile } from "../contacts/ContactList.tsx";
-import { ContactShow } from "../contacts/ContactShow.tsx";
-import { CompanyShow } from "../companies/CompanyShow.tsx";
-import { NoteShowPage } from "../notes/NoteShowPage.tsx";
+
+// Suspense Wrapper für Lazy Components
+const SuspenseWrapper = ({ children }: { children: React.ReactNode }) => (
+  <Suspense fallback={<PageLoading />}>
+    {children}
+  </Suspense>
+);
 
 export type CRMProps = {
   dataProvider?: DataProvider;
@@ -61,46 +74,6 @@ export type CRMProps = {
   disableTelemetry?: boolean;
 } & Partial<ConfigurationContextValue>;
 
-/**
- * CRM Component
- *
- * This component sets up and renders the main CRM application using `ra-core`. It provides
- * default configurations and themes but allows for customization through props. The component
- * wraps the application with a `ConfigurationProvider` to provide configuration values via context.
- *
- * @param {Array<ContactGender>} contactGender - The gender options for contacts used in the application.
- * @param {string[]} companySectors - The list of company sectors used in the application.
- * @param {RaThemeOptions} darkTheme - The theme to use when the application is in dark mode.
- * @param {string[]} dealCategories - The categories of deals used in the application.
- * @param {string[]} dealPipelineStatuses - The statuses of deals in the pipeline used in the application.
- * @param {DealStage[]} dealStages - The stages of deals used in the application.
- * @param {RaThemeOptions} lightTheme - The theme to use when the application is in light mode.
- * @param {string} logo - The logo used in the CRM application.
- * @param {NoteStatus[]} noteStatuses - The statuses of notes used in the application.
- * @param {string[]} taskTypes - The types of tasks used in the application.
- * @param {string} title - The title of the CRM application.
- *
- * @returns {JSX.Element} The rendered CRM application.
- *
- * @example
- * // Basic usage of the CRM component
- * import { CRM } from '@/components/atomic-crm/dashboard/CRM';
- *
- * const App = () => (
- *     <CRM
- *         logo="/path/to/logo.png"
- *         title="My Custom CRM"
- *         lightTheme={{
- *             ...defaultTheme,
- *             palette: {
- *                 primary: { main: '#0000ff' },
- *             },
- *         }}
- *     />
- * );
- *
- * export default App;
- */
 export const CRM = ({
   contactGender = defaultContactGender,
   companySectors = defaultCompanySectors,
@@ -167,9 +140,15 @@ export const CRM = ({
   );
 };
 
+const LazyDashboard = () => (
+  <SuspenseWrapper>
+    <Dashboard />
+  </SuspenseWrapper>
+);
+
 const DesktopAdmin = (props: CoreAdminProps) => {
   return (
-    <Admin layout={Layout} dashboard={Dashboard} {...props}>
+    <Admin layout={Layout} dashboard={LazyDashboard} {...props}>
       <CustomRoutes noLayout>
         <Route path={SignupPage.path} element={<SignupPage />} />
         <Route
@@ -183,10 +162,12 @@ const DesktopAdmin = (props: CoreAdminProps) => {
         />
         <Route path={OAuthConsentPage.path} element={<OAuthConsentPage />} />
       </CustomRoutes>
-
       <CustomRoutes>
-        <Route path={SettingsPage.path} element={<SettingsPage />} />
-        <Route path={ImportPage.path} element={<ImportPage />} />
+        <Route path="/settings" element={<SuspenseWrapper><SettingsPage /></SuspenseWrapper>} />
+        <Route path="/import" element={<SuspenseWrapper><ImportPage /></SuspenseWrapper>} />
+        <Route path="/admin/settings" element={<SuspenseWrapper><AdminSettingsPage /></SuspenseWrapper>} />
+        <Route path="/contacts-quickview" element={<SuspenseWrapper><ContactDataGrid /></SuspenseWrapper>} />
+        <Route path="/companies-quickview" element={<SuspenseWrapper><CompanyDataGrid /></SuspenseWrapper>} />
       </CustomRoutes>
       <Resource name="deals" {...deals} />
       <Resource name="contacts" {...contacts} />
@@ -196,35 +177,54 @@ const DesktopAdmin = (props: CoreAdminProps) => {
       <Resource name="tasks" />
       <Resource name="sales" {...sales} />
       <Resource name="tags" />
+      <Resource name="roles" />
+      <Resource name="role_permissions" />
+      <Resource name="teams" />
+      <Resource name="team_members" />
+      <Resource name="audit_logs" />
+      <Resource name="record_versions" />
+      <Resource name="custom_object_definitions" />
+      <Resource name="custom_field_definitions" />
+      <Resource name="custom_field_values" />
+      <Resource name="custom_object_data" />
+      <Resource name="object_relationships" />
+      <Resource name="relationship_definitions" />
     </Admin>
   );
 };
 
-const MobileAdmin = (props: CoreAdminProps) => {
-  const queryClient = new QueryClient({
-    defaultOptions: {
-      queries: {
-        gcTime: 1000 * 60 * 60 * 24, // 24 hours
-        networkMode: "offlineFirst",
-      },
-      mutations: {
-        networkMode: "offlineFirst",
-      },
-    },
-  });
-  const asyncStoragePersister = createAsyncStoragePersister({
-    storage: localStorage,
-  });
+const LazyMobileDashboard = () => (
+  <SuspenseWrapper>
+    <MobileDashboard />
+  </SuspenseWrapper>
+);
 
+const mobileQueryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      gcTime: 1000 * 60 * 60 * 24, // 24 hours
+      networkMode: "offlineFirst",
+    },
+    mutations: {
+      networkMode: "offlineFirst",
+    },
+  },
+});
+
+const mobileAsyncStoragePersister = createAsyncStoragePersister({
+  storage: localStorage,
+});
+
+const MobileAdmin = (props: CoreAdminProps) => {
   return (
     <PersistQueryClientProvider
-      client={queryClient}
-      persistOptions={{ persister: asyncStoragePersister }}
+      client={mobileQueryClient}
+      persistOptions={{ persister: mobileAsyncStoragePersister }}
     >
       <Admin
-        queryClient={queryClient}
+        queryClient={mobileQueryClient}
         layout={MobileLayout}
-        dashboard={MobileDashboard}
+        dashboard={LazyMobileDashboard}
         {...props}
       >
         <CustomRoutes noLayout>
@@ -242,14 +242,14 @@ const MobileAdmin = (props: CoreAdminProps) => {
         </CustomRoutes>
         <Resource
           name="contacts"
-          list={ContactListMobile}
-          show={ContactShow}
+          list={() => <SuspenseWrapper><ContactListMobile /></SuspenseWrapper>}
+          show={() => <SuspenseWrapper><ContactShow /></SuspenseWrapper>}
           recordRepresentation={contacts.recordRepresentation}
         >
-          <Route path=":id/notes/:noteId" element={<NoteShowPage />} />
+          <Route path=":id/notes/:noteId" element={<SuspenseWrapper><NoteShowPage /></SuspenseWrapper>} />
         </Resource>
-        <Resource name="companies" show={CompanyShow} />
-        <Resource name="tasks" list={MobileTasksList} />
+        <Resource name="companies" show={() => <SuspenseWrapper><CompanyShow /></SuspenseWrapper>} />
+        <Resource name="tasks" list={() => <SuspenseWrapper><MobileTasksList /></SuspenseWrapper>} />
       </Admin>
     </PersistQueryClientProvider>
   );

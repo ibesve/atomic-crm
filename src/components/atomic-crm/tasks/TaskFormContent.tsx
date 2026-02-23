@@ -48,6 +48,20 @@ export const TaskFormContent = ({
           helperText={false}
         />
       </div>
+
+      <ReferenceInput
+        source="sales_id"
+        reference="sales"
+        filter={{ "disabled@neq": true }}
+      >
+        <SelectInput
+          label="Zuständig"
+          helperText={false}
+          optionText={(record: any) =>
+            `${record.first_name} ${record.last_name}`
+          }
+        />
+      </ReferenceInput>
     </div>
   );
 };
