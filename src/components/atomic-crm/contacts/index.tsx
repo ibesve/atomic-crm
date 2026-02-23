@@ -3,6 +3,9 @@ import { ContactCreate } from "./ContactCreate";
 import { ContactEdit } from "./ContactEdit";
 import { ContactList } from "./ContactList";
 import { ContactShow } from "./ContactShow";
+import { ContactDataGrid } from "./ContactDataGrid";
+
+export { ContactDataGrid };
 
 export default {
   list: ContactList,

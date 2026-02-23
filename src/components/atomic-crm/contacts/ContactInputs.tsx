@@ -4,18 +4,17 @@ import { useFormContext } from "react-hook-form";
 import { Separator } from "@/components/ui/separator";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { BooleanInput } from "@/components/admin/boolean-input";
-import { ReferenceInput } from "@/components/admin/reference-input";
 import { TextInput } from "@/components/admin/text-input";
 import { RadioButtonGroupInput } from "@/components/admin/radio-button-group-input";
 import { SelectInput } from "@/components/admin/select-input";
 import { ArrayInput } from "@/components/admin/array-input";
 import { SimpleFormIterator } from "@/components/admin/simple-form-iterator";
-
+import { ReferenceInputWithCreate } from "@/components/admin/reference-input-with-create";
 import { isLinkedinUrl } from "../misc/isLinkedInUrl";
-import { contactGender } from "./contactGender";
-import type { Sale } from "../types";
+import { useConfigurationContext } from "../root/ConfigurationContext";
 import { Avatar } from "./Avatar";
-import { AutocompleteCompanyInput } from "../companies/AutocompleteCompanyInput.tsx";
+import { CustomFieldsSection } from "../custom-objects/CustomFieldsSection";
+import { useState, useEffect, useCallback } from "react";
 
 export const ContactInputs = () => {
   const isMobile = useIsMobile();
@@ -38,6 +37,8 @@ export const ContactInputs = () => {
           <ContactMiscInputs />
         </div>
       </div>
+      <Separator className="my-4" />
+      <CustomFieldsSection entityType="contacts" />
     </div>
   );
 };
@@ -45,7 +46,7 @@ export const ContactInputs = () => {
 const ContactIdentityInputs = () => {
   return (
     <div className="flex flex-col gap-4">
-      <h6 className="text-lg font-semibold">Identity</h6>
+      <h6 className="text-lg font-semibold">Identität</h6>
       <RadioButtonGroupInput
         label={false}
         row
@@ -63,13 +64,82 @@ const ContactIdentityInputs = () => {
 };
 
 const ContactPositionInputs = () => {
+  const { setValue, watch, getValues } = useFormContext();
+  const { companySectors } = useConfigurationContext();
+  
+  // Verwende getValues für den initialen Wert, nicht watch
+  const [companyId, setCompanyId] = useState<number | null>(() => getValues("company_id") ?? null);
+
+  // Synchronisiere mit dem Formular wenn sich der Wert extern ändert
+  const watchedCompanyId = watch("company_id");
+  useEffect(() => {
+    if (watchedCompanyId !== undefined && watchedCompanyId !== companyId) {
+      setCompanyId(watchedCompanyId);
+    }
+  }, [watchedCompanyId, companyId]);
+
+  const handleCompanyChange = useCallback((value: number | string | null) => {
+    // Company changed
+    setCompanyId(value as number | null);
+    setValue("company_id", value, { shouldDirty: true, shouldValidate: true, shouldTouch: true });
+  }, [setValue]);
+
   return (
     <div className="flex flex-col gap-4">
       <h6 className="text-lg font-semibold">Position</h6>
-      <TextInput source="title" helperText={false} />
-      <ReferenceInput source="company_id" reference="companies" perPage={10}>
-        <AutocompleteCompanyInput />
-      </ReferenceInput>
+      <TextInput source="title" helperText={false} label="Titel / Position" />
+      
+      {/* Unternehmen mit Nested Create Form */}
+      <ReferenceInputWithCreate
+        source="company_id"
+        reference="companies"
+        label="Unternehmen"
+        optionText="name"
+        value={companyId}
+        onChange={handleCompanyChange}
+        createTitle="Neues Unternehmen erstellen"
+        createFields={[
+          {
+            source: "name",
+            label: "Firmenname",
+            type: "text",
+            required: true,
+            placeholder: "z.B. Musterfirma GmbH",
+          },
+          {
+            source: "sector",
+            label: "Branche",
+            type: "select",
+            options: companySectors.map((s) => ({ value: s, label: s })),
+          },
+          {
+            source: "website",
+            label: "Website",
+            type: "text",
+            placeholder: "https://...",
+          },
+          {
+            source: "phone_number",
+            label: "Telefon",
+            type: "tel",
+          },
+          {
+            source: "address",
+            label: "Adresse",
+            type: "text",
+          },
+          {
+            source: "city",
+            label: "Stadt",
+            type: "text",
+          },
+          {
+            source: "zipcode",
+            label: "PLZ",
+            type: "text",
+          },
+        ]}
+      />
     </div>
   );
 };
@@ -77,7 +147,6 @@ const ContactPositionInputs = () => {
 const ContactPersonalInformationInputs = () => {
   const { getValues, setValue } = useFormContext();
 
-  // set first and last name based on email
   const handleEmailChange = (email: string) => {
     const { first_name, last_name } = getValues();
     if (first_name || last_name || !email) return;
@@ -105,10 +174,10 @@ const ContactPersonalInformationInputs = () => {
 
   return (
     <div className="flex flex-col gap-4">
-      <h6 className="text-lg font-semibold">Personal info</h6>
+      <h6 className="text-lg font-semibold">Kontaktdaten</h6>
       <ArrayInput
         source="email_jsonb"
-        label="Email addresses"
+        label="E-Mail-Adressen"
         helperText={false}
       >
         <SimpleFormIterator
@@ -122,7 +191,7 @@ const ContactPersonalInformationInputs = () => {
             className="w-full"
             helperText={false}
             label={false}
-            placeholder="Email"
+            placeholder="E-Mail"
             validate={email()}
             onPaste={handleEmailPaste}
             onBlur={handleEmailBlur}
@@ -138,7 +207,7 @@ const ContactPersonalInformationInputs = () => {
           />
         </SimpleFormIterator>
       </ArrayInput>
-      <ArrayInput source="phone_jsonb" label="Phone numbers" helperText={false}>
+      <ArrayInput source="phone_jsonb" label="Telefonnummern" helperText={false}>
         <SimpleFormIterator
           inline
           disableReordering
@@ -150,7 +219,7 @@ const ContactPersonalInformationInputs = () => {
             className="w-full"
             helperText={false}
             label={false}
-            placeholder="Phone number"
+            placeholder="Telefonnummer"
           />
           <SelectInput
             source="type"
@@ -165,7 +234,7 @@ const ContactPersonalInformationInputs = () => {
       </ArrayInput>
       <TextInput
         source="linkedin_url"
-        label="Linkedin URL"
+        label="LinkedIn URL"
         helperText={false}
         validate={isLinkedinUrl}
       />
@@ -173,37 +242,58 @@ const ContactPersonalInformationInputs = () => {
   );
 };
 
-const personalInfoTypes = [{ id: "Work" }, { id: "Home" }, { id: "Other" }];
+const personalInfoTypes = [
+  { id: "Work", label: "Arbeit" },
+  { id: "Home", label: "Privat" },
+  { id: "Other", label: "Sonstige" },
+];
 
 const ContactMiscInputs = () => {
+  const { setValue, watch } = useFormContext();
+  const salesId = watch("sales_id");
+
   return (
     <div className="flex flex-col gap-4">
-      <h6 className="text-lg font-semibold">Misc</h6>
+      <h6 className="text-lg font-semibold">Sonstiges</h6>
       <TextInput
         source="background"
-        label="Background info (bio, how you met, etc)"
+        label="Hintergrundinformationen"
         multiline
         helperText={false}
       />
-      <BooleanInput source="has_newsletter" helperText={false} />
-      <ReferenceInput
-        reference="sales"
+      <BooleanInput source="has_newsletter" label="Newsletter" helperText={false} />
+      
+      {/* Kundenbetreuer mit Nested Create */}
+      <ReferenceInputWithCreate
         source="sales_id"
-        sort={{ field: "last_name", order: "ASC" }}
-        filter={{
-          "disabled@neq": true,
-        }}
-      >
-        <SelectInput
-          helperText={false}
-          label="Account manager"
-          optionText={saleOptionRenderer}
-          validate={required()}
-        />
-      </ReferenceInput>
+        reference="sales"
+        label="Kundenbetreuer"
+        optionText={(record) => `${record.first_name} ${record.last_name}`}
+        value={salesId}
+        onChange={(value) => setValue("sales_id", value, { shouldDirty: true, shouldValidate: true })}
+        createTitle="Neuen Benutzer erstellen"
+        allowCreate={false} // Benutzer sollten über die Benutzerverwaltung erstellt werden
+        createFields={[
+          {
+            source: "first_name",
+            label: "Vorname",
+            type: "text",
+            required: true,
+          },
+          {
+            source: "last_name",
+            label: "Nachname",
+            type: "text",
+            required: true,
+          },
+          {
+            source: "email",
+            label: "E-Mail",
+            type: "email",
+            required: true,
+          },
+        ]}
+      />
     </div>
   );
 };
-
-const saleOptionRenderer = (choice: Sale) =>
-  `${choice.first_name} ${choice.last_name}`;
