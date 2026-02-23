@@ -1,4 +1,4 @@
-import { ReactNode, useState, useCallback, useEffect, useMemo } from "react";
+import { ReactNode, useState, useCallback, useEffect, useMemo, useRef } from "react";
 import {
   useGetList,
   useNotify,
@@ -66,6 +66,10 @@ export interface EditableColumnDef<RecordType extends RaRecord = RaRecord> {
   filterable?: boolean;
   defaultHidden?: boolean;
   width?: string;
+  /** Transform the edited value before saving. Receives the new value and original record, returns the data to save */
+  transformValue?: (value: unknown, record: RecordType) => Record<string, unknown>;
+  /** Extract the editable value from the record for the input field */
+  getEditValue?: (record: RecordType) => unknown;
 }
 
 interface DataGridState {
@@ -73,6 +77,7 @@ interface DataGridState {
   hiddenColumns: string[];
   sort: { field: string; order: "ASC" | "DESC" };
   showDeleted: boolean;
+  columnWidths: Record<string, number>;
 }
 
 interface EditableDataGridProps<RecordType extends RaRecord = RaRecord> {
@@ -84,6 +89,7 @@ interface EditableDataGridProps<RecordType extends RaRecord = RaRecord> {
   className?: string;
   storeKey?: string;
   enableSoftDelete?: boolean;
+  onRowClick?: (record: RecordType) => void;
 }
 
 export function EditableDataGrid<RecordType extends RaRecord = RaRecord>({
@@ -95,6 +101,7 @@ export function EditableDataGrid<RecordType extends RaRecord = RaRecord>({
   className,
   storeKey,
   enableSoftDelete = true,
+  onRowClick,
 }: EditableDataGridProps<RecordType>) {
   const translate = useTranslate();
   const notify = useNotify();
@@ -112,6 +119,7 @@ export function EditableDataGrid<RecordType extends RaRecord = RaRecord>({
           hiddenColumns: parsed.hiddenColumns || columns.filter(c => c.defaultHidden).map(c => c.source),
           sort: parsed.sort || defaultSort,
           showDeleted: parsed.showDeleted || false,
+          columnWidths: parsed.columnWidths || {},
         };
       }
     } catch {
@@ -122,6 +130,7 @@ export function EditableDataGrid<RecordType extends RaRecord = RaRecord>({
       hiddenColumns: columns.filter(c => c.defaultHidden).map(c => c.source),
       sort: defaultSort,
       showDeleted: false,
+      columnWidths: {},
     };
   }, [columns, defaultSort, storageKey]);
 
@@ -154,6 +163,14 @@ export function EditableDataGrid<RecordType extends RaRecord = RaRecord>({
   const [draggedColumn, setDraggedColumn] = useState<string | null>(null);
   const [dragOverColumn, setDragOverColumn] = useState<string | null>(null);
 
+  // Column resize state
+  const resizeRef = useRef<{
+    column: string;
+    startX: number;
+    startWidth: number;
+  } | null>(null);
+  const tableRef = useRef<HTMLDivElement>(null);
+
   useEffect(() => {
     try {
       localStorage.setItem(storageKey, JSON.stringify(state));
@@ -176,7 +193,7 @@ export function EditableDataGrid<RecordType extends RaRecord = RaRecord>({
     return baseFilter;
   }, [filters, state.showDeleted, enableSoftDelete]);
 
-  const { data, isPending } = useGetList<RecordType>(resource, {
+  const { data, total, isPending } = useGetList<RecordType>(resource, {
     pagination: { page: 1, perPage: 100 },
     sort: state.sort,
     filter: buildFilter(),
@@ -268,11 +285,49 @@ export function EditableDataGrid<RecordType extends RaRecord = RaRecord>({
     setDragOverColumn(null);
   }, []);
 
+  // ── Column resize handlers ─────────────────────────────────────────
+  const handleResizeStart = useCallback((e: React.MouseEvent, source: string) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const th = (e.target as HTMLElement).closest("th");
+    const startWidth = th ? th.getBoundingClientRect().width : 150;
+    resizeRef.current = { column: source, startX: e.clientX, startWidth };
+    document.body.style.cursor = "col-resize";
+    document.body.style.userSelect = "none";
+  }, []);
+
+  useEffect(() => {
+    const handleMouseMove = (e: MouseEvent) => {
+      if (!resizeRef.current) return;
+      const { column, startX, startWidth } = resizeRef.current;
+      const newWidth = Math.max(60, startWidth + (e.clientX - startX));
+      setState(prev => ({
+        ...prev,
+        columnWidths: { ...prev.columnWidths, [column]: newWidth },
+      }));
+    };
+
+    const handleMouseUp = () => {
+      if (!resizeRef.current) return;
+      resizeRef.current = null;
+      document.body.style.cursor = "";
+      document.body.style.userSelect = "";
+    };
+
+    document.addEventListener("mousemove", handleMouseMove);
+    document.addEventListener("mouseup", handleMouseUp);
+    return () => {
+      document.removeEventListener("mousemove", handleMouseMove);
+      document.removeEventListener("mouseup", handleMouseUp);
+    };
+  }, []);
+
   const resetColumnOrder = useCallback(() => {
     setState((prev) => ({
       ...prev,
       columnOrder: columns.map(c => c.source),
       hiddenColumns: columns.filter(c => c.defaultHidden).map(c => c.source),
+      columnWidths: {},
     }));
     notify(translate("ra.message.settings_reset", { _: "Einstellungen zurückgesetzt" }), { type: "info" });
   }, [columns, notify, translate]);
@@ -462,8 +517,8 @@ export function EditableDataGrid<RecordType extends RaRecord = RaRecord>({
       </p>
 
       {/* Table */}
-      <div className="rounded-md border">
-        <Table>
+      <div className="rounded-md border overflow-x-auto" ref={tableRef}>
+        <Table className="table-fixed">
           <TableHeader>
             <TableRow>
               {bulkActions && (
@@ -484,19 +539,19 @@ export function EditableDataGrid<RecordType extends RaRecord = RaRecord>({
                   onDrop={(e) => handleDrop(e, col.source)}
                   onDragEnd={handleDragEnd}
                   className={cn(
-                    "cursor-grab select-none transition-colors",
+                    "cursor-grab select-none transition-colors relative group/resize",
                     col.sortable !== false && "cursor-grab",
                     draggedColumn === col.source && "opacity-50 bg-muted",
                     dragOverColumn === col.source && "bg-primary/10 border-l-2 border-primary"
                   )}
-                  style={{ width: col.width }}
+                  style={{ width: state.columnWidths[col.source] || col.width }}
                 >
                   <div 
                     className="flex items-center gap-1"
                     onClick={() => col.sortable !== false && handleSort(col.source)}
                   >
                     <GripVertical className="h-3 w-3 text-muted-foreground/50" />
-                    <span className="flex-1">{col.label}</span>
+                    <span className="flex-1 truncate">{col.label}</span>
                     {state.sort.field === col.source && (
                       state.sort.order === "ASC" ? (
                         <ChevronUp className="h-4 w-4" />
@@ -505,6 +560,11 @@ export function EditableDataGrid<RecordType extends RaRecord = RaRecord>({
                       )
                     )}
                   </div>
+                  {/* Resize handle */}
+                  <div
+                    className="absolute right-0 top-0 h-full w-1.5 cursor-col-resize opacity-0 group-hover/resize:opacity-100 bg-primary/30 hover:bg-primary/60 transition-opacity"
+                    onMouseDown={(e) => handleResizeStart(e, col.source)}
+                  />
                 </TableHead>
               ))}
               <TableHead className="w-12">{/* Actions */}</TableHead>
@@ -534,8 +594,10 @@ export function EditableDataGrid<RecordType extends RaRecord = RaRecord>({
                 <RecordContextProvider key={record.id} value={record}>
                   <TableRow
                     className={cn(
-                      isDeleted(record) && "opacity-50 bg-red-50/50 dark:bg-red-950/20"
+                      isDeleted(record) && "opacity-50 bg-red-50/50 dark:bg-red-950/20",
+                      onRowClick && "cursor-pointer hover:bg-accent/50"
                     )}
+                    onClick={() => onRowClick?.(record)}
                   >
                     {bulkActions && (
                       <TableCell>
@@ -555,6 +617,8 @@ export function EditableDataGrid<RecordType extends RaRecord = RaRecord>({
                           type={col.type}
                           options={col.options}
                           referenceData={getReferenceData(col)}
+                          transformValue={col.transformValue}
+                          getEditValue={col.getEditValue}
                           renderDisplay={
                             col.render
                               ? (_, r) => col.render!(r as RecordType)

@@ -19,6 +19,163 @@ import { getActivityLog } from "../commons/activity";
 import { getIsInitialized } from "./authProvider";
 import { supabase } from "./supabase";
 
+// ── Custom Field helpers ──────────────────────────────────────────────
+// Temporary storage for _cf_ values stripped in beforeSave,
+// keyed by `${resource}_${recordId}` or a unique token for creates.
+const pendingCustomFields = new Map<string, Record<string, unknown>>();
+let pendingCreateCfData: Record<string, unknown> | null = null;
+
+/**
+ * Strip `_cf_*` keys from a record, store them aside, and return the cleaned record.
+ */
+function stripCustomFields<T extends Record<string, unknown>>(data: T): T {
+  const cfEntries: Record<string, unknown> = {};
+  const cleaned = { ...data };
+  for (const key of Object.keys(cleaned)) {
+    if (key.startsWith("_cf_")) {
+      cfEntries[key] = cleaned[key];
+      delete cleaned[key];
+    }
+  }
+  if (Object.keys(cfEntries).length > 0) {
+    // Store for afterSave — for updates we key by id, for creates we use a singleton
+    if ((data as any).id) {
+      pendingCustomFields.set(`${(data as any).id}`, cfEntries);
+    } else {
+      pendingCreateCfData = cfEntries;
+    }
+  }
+  return cleaned;
+}
+
+/**
+ * After a record is saved, persist any pending _cf_ values to custom_field_values.
+ * Wrapped in try-catch so it fails gracefully if the tables don't exist yet.
+ */
+async function saveCustomFieldValues(
+  record: Record<string, unknown>,
+  dataProvider: DataProvider,
+  entityIdField: "contact_id" | "company_id" | "deal_id",
+) {
+  const id = record.id as number;
+  const cfData = pendingCustomFields.get(`${id}`) || pendingCreateCfData;
+  if (!cfData || Object.keys(cfData).length === 0) {
+    pendingCreateCfData = null;
+    return record;
+  }
+  pendingCustomFields.delete(`${id}`);
+  pendingCreateCfData = null;
+
+  try {
+  // Determine entity_type from entityIdField
+  const entityType = entityIdField.replace("_id", "") === "contact" ? "contacts"
+    : entityIdField.replace("_id", "") === "company" ? "companies" : "deals";
+
+  // Load field definitions for this entity type
+  const { data: fieldDefs } = await dataProvider.getList("custom_field_definitions", {
+    pagination: { page: 1, perPage: 200 },
+    sort: { field: "id", order: "ASC" },
+    filter: { entity_type: entityType, "deleted_at@is": "null" },
+  });
+
+  if (!fieldDefs || fieldDefs.length === 0) return record;
+
+  // Load existing custom field values for this record
+  const { data: existingValues } = await dataProvider.getList("custom_field_values", {
+    pagination: { page: 1, perPage: 200 },
+    sort: { field: "id", order: "ASC" },
+    filter: { [entityIdField]: id },
+  });
+
+  const existingByFieldId = new Map(
+    (existingValues || []).map((v: any) => [v.field_definition_id, v]),
+  );
+
+  for (const fieldDef of fieldDefs) {
+    const cfKey = `_cf_${fieldDef.name}`;
+    if (!(cfKey in cfData)) continue;
+
+    const value = cfData[cfKey];
+    const existing = existingByFieldId.get(fieldDef.id);
+
+    if (existing) {
+      // Update existing value
+      await dataProvider.update("custom_field_values", {
+        id: existing.id,
+        data: { value: value ?? null, updated_at: new Date().toISOString() },
+        previousData: existing,
+      });
+    } else {
+      // Create new value
+      await dataProvider.create("custom_field_values", {
+        data: {
+          field_definition_id: fieldDef.id,
+          [entityIdField]: id,
+          value: value ?? null,
+        },
+      });
+    }
+  }
+  } catch (e) {
+    // Tables may not exist yet on remote — fail silently
+    console.warn("saveCustomFieldValues: skipped (tables may not exist)", e);
+  }
+
+  return record;
+}
+
+/**
+ * After reading a record, merge in its custom field values as _cf_* keys.
+ * Wrapped in try-catch so it fails gracefully if the tables don't exist yet.
+ */
+async function mergeCustomFieldValues(
+  record: Record<string, unknown>,
+  dataProvider: DataProvider,
+  entityIdField: "contact_id" | "company_id" | "deal_id",
+) {
+  const id = record.id as number;
+  if (!id) return record;
+
+  try {
+  const entityType = entityIdField.replace("_id", "") === "contact" ? "contacts"
+    : entityIdField.replace("_id", "") === "company" ? "companies" : "deals";
+
+  // Load field definitions
+  const { data: fieldDefs } = await dataProvider.getList("custom_field_definitions", {
+    pagination: { page: 1, perPage: 200 },
+    sort: { field: "id", order: "ASC" },
+    filter: { entity_type: entityType, "deleted_at@is": "null" },
+  });
+
+  if (!fieldDefs || fieldDefs.length === 0) return record;
+
+  // Load this record's custom field values
+  const { data: values } = await dataProvider.getList("custom_field_values", {
+    pagination: { page: 1, perPage: 200 },
+    sort: { field: "id", order: "ASC" },
+    filter: { [entityIdField]: id },
+  });
+
+  if (!values || values.length === 0) return record;
+
+  const valueByFieldId = new Map(
+    values.map((v: any) => [v.field_definition_id, v.value]),
+  );
+
+  for (const fieldDef of fieldDefs) {
+    const val = valueByFieldId.get(fieldDef.id);
+    if (val !== undefined) {
+      (record as any)[`_cf_${fieldDef.name}`] = val;
+    }
+  }
+  } catch (e) {
+    // Tables may not exist yet on remote — fail silently
+    console.warn("mergeCustomFieldValues: skipped (tables may not exist)", e);
+  }
+
+  return record;
+}
+
 if (import.meta.env.VITE_SUPABASE_URL === undefined) {
   throw new Error("Please set the VITE_SUPABASE_URL environment variable");
 }
@@ -250,6 +407,13 @@ const lifeCycleCallbacks: ResourceCallbacks[] = [
   },
   {
     resource: "contacts",
+    beforeSave: async (data: any) => stripCustomFields(data),
+    afterSave: async (record: any, dataProvider: DataProvider) => {
+      return saveCustomFieldValues(record, dataProvider, "contact_id");
+    },
+    afterRead: async (record: any, dataProvider: DataProvider) => {
+      return mergeCustomFieldValues(record, dataProvider, "contact_id");
+    },
     beforeGetList: async (params) => {
       return applyFullTextSearch([
         "first_name",
@@ -264,6 +428,13 @@ const lifeCycleCallbacks: ResourceCallbacks[] = [
   },
   {
     resource: "companies",
+    beforeSave: async (data: any) => stripCustomFields(data),
+    afterSave: async (record: any, dataProvider: DataProvider) => {
+      return saveCustomFieldValues(record, dataProvider, "company_id");
+    },
+    afterRead: async (record: any, dataProvider: DataProvider) => {
+      return mergeCustomFieldValues(record, dataProvider, "company_id");
+    },
     beforeGetList: async (params) => {
       return applyFullTextSearch([
         "name",
@@ -297,6 +468,13 @@ const lifeCycleCallbacks: ResourceCallbacks[] = [
   },
   {
     resource: "deals",
+    beforeSave: async (data: any) => stripCustomFields(data),
+    afterSave: async (record: any, dataProvider: DataProvider) => {
+      return saveCustomFieldValues(record, dataProvider, "deal_id");
+    },
+    afterRead: async (record: any, dataProvider: DataProvider) => {
+      return mergeCustomFieldValues(record, dataProvider, "deal_id");
+    },
     beforeGetList: async (params) => {
       return applyFullTextSearch(["name", "category", "description"])(params);
     },

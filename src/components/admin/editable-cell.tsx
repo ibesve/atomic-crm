@@ -31,6 +31,10 @@ interface EditableCellProps<RecordType extends RaRecord = RaRecord> {
   referenceData?: RaRecord[];
   renderDisplay?: (value: unknown, record: RecordType) => ReactNode;
   className?: string;
+  /** Transform the edited value before saving */
+  transformValue?: (value: unknown, record: RecordType) => Record<string, unknown>;
+  /** Extract the editable value from the record for the input field */
+  getEditValue?: (record: RecordType) => unknown;
 }
 
 export function EditableCell<RecordType extends RaRecord = RaRecord>({
@@ -42,6 +46,8 @@ export function EditableCell<RecordType extends RaRecord = RaRecord>({
   referenceData,
   renderDisplay,
   className,
+  transformValue,
+  getEditValue,
 }: EditableCellProps<RecordType>) {
   const record = useRecordContext<RecordType>();
   const [isEditing, setIsEditing] = useState(false);
@@ -65,7 +71,7 @@ export function EditableCell<RecordType extends RaRecord = RaRecord>({
         resource,
         {
           id: record.id,
-          data: { [source]: value },
+          data: transformValue ? transformValue(value, record) : { [source]: value },
           previousData: record,
         },
         {
@@ -86,7 +92,7 @@ export function EditableCell<RecordType extends RaRecord = RaRecord>({
     } catch {
       // Error handled in onError callback
     }
-  }, [record, resource, source, value, originalValue, update, notify, translate, refresh]);
+  }, [record, resource, source, value, originalValue, update, notify, translate, refresh, transformValue]);
 
   // Click-Outside-Handler: Speichert automatisch beim Klick außerhalb
   useEffect(() => {
@@ -116,7 +122,7 @@ export function EditableCell<RecordType extends RaRecord = RaRecord>({
     (e: React.MouseEvent) => {
       e.stopPropagation();
       if (record) {
-        const currentVal = getNestedValue(record, source);
+        const currentVal = getEditValue ? getEditValue(record) : getNestedValue(record, source);
         setValue(currentVal);
         setOriginalValue(currentVal);
         setIsEditing(true);
@@ -126,7 +132,7 @@ export function EditableCell<RecordType extends RaRecord = RaRecord>({
         }
       }
     },
-    [record, source, type]
+    [record, source, type, getEditValue]
   );
 
   const cancelEditing = useCallback((e?: { stopPropagation?: () => void }) => {
@@ -153,7 +159,7 @@ export function EditableCell<RecordType extends RaRecord = RaRecord>({
       resource,
       {
         id: record.id,
-        data: { [source]: parsedValue },
+        data: transformValue ? transformValue(parsedValue, record) : { [source]: parsedValue },
         previousData: record,
       },
       {
@@ -172,7 +178,7 @@ export function EditableCell<RecordType extends RaRecord = RaRecord>({
         },
       }
     );
-  }, [record, resource, source, originalValue, type, update, notify, translate, refresh]);
+  }, [record, resource, source, originalValue, type, update, notify, translate, refresh, transformValue]);
 
   if (!record) return null;
 

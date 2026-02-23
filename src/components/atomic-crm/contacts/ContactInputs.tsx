@@ -13,6 +13,7 @@ import { ReferenceInputWithCreate } from "@/components/admin/reference-input-wit
 import { isLinkedinUrl } from "../misc/isLinkedInUrl";
 import { useConfigurationContext } from "../root/ConfigurationContext";
 import { Avatar } from "./Avatar";
+import { CustomFieldsSection } from "../custom-objects/CustomFieldsSection";
 import { useState, useEffect, useCallback } from "react";
 
 export const ContactInputs = () => {
@@ -36,6 +37,8 @@ export const ContactInputs = () => {
           <ContactMiscInputs />
         </div>
       </div>
+      <Separator className="my-4" />
+      <CustomFieldsSection entityType="contacts" />
     </div>
   );
 };

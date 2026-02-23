@@ -1,24 +1,24 @@
 import { RecordRepresentation, type Identifier } from "ra-core";
 import { EditSheet } from "../misc/EditSheet";
-import { ContactInputs } from "./ContactInputs";
+import { CompanyInputs } from "./CompanyInputs";
 import { RelationshipManager } from "../custom-objects/RelationshipManager";
 import { Separator } from "@/components/ui/separator";
 
-export interface ContactEditSheetProps {
+export interface CompanyEditSheetProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  contactId: Identifier;
+  companyId: Identifier;
 }
 
-export const ContactEditSheet = ({
+export const CompanyEditSheet = ({
   open,
   onOpenChange,
-  contactId,
-}: ContactEditSheetProps) => {
+  companyId,
+}: CompanyEditSheetProps) => {
   return (
     <EditSheet
-      resource="contacts"
-      id={contactId}
+      resource="companies"
+      id={companyId}
       title={
         <h1 className="text-xl font-semibold">
           Edit <RecordRepresentation />
@@ -27,11 +27,11 @@ export const ContactEditSheet = ({
       open={open}
       onOpenChange={onOpenChange}
     >
-      <ContactInputs />
+      <CompanyInputs />
       <Separator />
       <RelationshipManager
-        sourceType="contacts"
-        sourceId={contactId as number}
+        sourceType="companies"
+        sourceId={companyId as number}
         title="Verknüpfungen"
       />
     </EditSheet>

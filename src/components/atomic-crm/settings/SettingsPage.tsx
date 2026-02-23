@@ -12,7 +12,8 @@ import {
   Sun,
   Moon,
   Monitor,
-  Check
+  Check,
+  Link2,
 } from "lucide-react";
 import {
   Form,
@@ -47,6 +48,7 @@ import {
 } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
 import ImageEditorField from "../misc/ImageEditorField";
+import { RelationshipDefinitionManager } from "../custom-objects/RelationshipDefinitionManager";
 import type { CrmDataProvider } from "../providers/types";
 import type { Sale, SalesFormData } from "../types";
 
@@ -192,7 +194,7 @@ export const SettingsPage = () => {
 
       {/* Tabs */}
       <Tabs defaultValue="profile" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-4">
+        <TabsList className="grid w-full grid-cols-5">
           <TabsTrigger value="profile" className="gap-2">
             <User className="w-4 h-4" />
             <span className="hidden sm:inline">
@@ -215,6 +217,12 @@ export const SettingsPage = () => {
             <Languages className="w-4 h-4" />
             <span className="hidden sm:inline">
               {translate("crm.settings.language", { _: "Sprache" })}
+            </span>
+          </TabsTrigger>
+          <TabsTrigger value="custom-objects" className="gap-2">
+            <Link2 className="w-4 h-4" />
+            <span className="hidden sm:inline">
+              {translate("crm.settings.custom_objects", { _: "Beziehungen" })}
             </span>
           </TabsTrigger>
         </TabsList>
@@ -418,6 +426,11 @@ export const SettingsPage = () => {
               </div>
             </CardContent>
           </Card>
+        </TabsContent>
+
+        {/* Custom Objects & Beziehungen Tab */}
+        <TabsContent value="custom-objects">
+          <RelationshipDefinitionManager />
         </TabsContent>
       </Tabs>
     </div>

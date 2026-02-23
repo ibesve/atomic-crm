@@ -67,6 +67,7 @@ import type {
   CustomFieldDefinition,
   CustomFieldFormData,
   CustomFieldType,
+  CustomObjectDefinition,
   SelectOption,
 } from "../types/custom-objects";
 import { FIELD_TYPE_LABELS } from "../types/custom-objects";
@@ -132,6 +133,16 @@ export function CustomFieldsManager({
   const [formData, setFormData] =
     useState<CustomFieldFormData>(DEFAULT_FORM_DATA);
   const [newOption, setNewOption] = useState("");
+
+  // Load custom object definitions for reference field type
+  const { data: allCustomObjects } = useGetList<CustomObjectDefinition>(
+    "custom_object_definitions",
+    {
+      pagination: { page: 1, perPage: 100 },
+      sort: { field: "label", order: "ASC" },
+      filter: { "deleted_at@is": "null", is_active: true },
+    }
+  );
 
   // Filter basierend auf customObjectId oder entityType
   const filter: Record<string, unknown> = { "deleted_at@is": "null" };
@@ -576,7 +587,16 @@ export function CustomFieldsManager({
                       <SelectItem value="contacts">{translate("crm.custom_fields.ref_contacts")}</SelectItem>
                       <SelectItem value="companies">{translate("crm.custom_fields.ref_companies")}</SelectItem>
                       <SelectItem value="deals">{translate("crm.custom_fields.ref_deals")}</SelectItem>
-                      {/* Hier könnten dynamisch Custom Objects geladen werden */}
+                      {allCustomObjects && allCustomObjects.length > 0 && (
+                        <>
+                          <div className="border-t my-1" />
+                          {allCustomObjects.map((obj) => (
+                            <SelectItem key={obj.id} value={`custom_${obj.name}`}>
+                              {obj.label}
+                            </SelectItem>
+                          ))}
+                        </>
+                      )}
                     </SelectContent>
                   </Select>
                 </div>

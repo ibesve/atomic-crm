@@ -1,10 +1,12 @@
 import { useTranslate, useGetList } from "ra-core";
 import { Link, useNavigate } from "react-router";
 import { ExternalLink } from "lucide-react";
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { EditableDataGrid } from "@/components/admin/editable-datagrid";
 import type { EditableColumnDef } from "@/components/admin/editable-datagrid";
 import type { Contact, Company, Sale } from "../types";
+import { useCustomFieldColumns } from "../custom-objects/useCustomFieldColumns";
+import { ContactEditSheet } from "./ContactEditSheet";
 
 // Hilfsfunktion um die erste E-Mail aus email_jsonb zu extrahieren
 const getFirstEmail = (emailJsonb: any): string => {
@@ -25,6 +27,8 @@ const getFirstPhone = (phoneJsonb: any): string => {
 export const ContactDataGrid = () => {
   const translate = useTranslate();
   const navigate = useNavigate();
+  const [editSheetOpen, setEditSheetOpen] = useState(false);
+  const [editSheetContactId, setEditSheetContactId] = useState<number | null>(null);
 
   // Lade Referenzdaten für Dropdown-Auswahl
   const { data: companies } = useGetList<Company>("companies", {
@@ -36,6 +40,9 @@ export const ContactDataGrid = () => {
     pagination: { page: 1, perPage: 100 },
     sort: { field: "last_name", order: "ASC" },
   });
+
+  // Load custom field columns for contacts
+  const { columns: customFieldCols } = useCustomFieldColumns<Contact>("contacts", "contact_id");
 
   // Columns mit useMemo, um sie nur bei Änderungen der Referenzdaten neu zu erstellen
   const columns: EditableColumnDef<Contact>[] = useMemo(() => [
@@ -52,13 +59,39 @@ export const ContactDataGrid = () => {
       editable: true,
       type: "text",
       sortable: true,
+      render: (record) => (
+        <Link
+          to={`/contacts/${record.id}/show`}
+          className="text-primary hover:underline font-medium"
+          onClick={(e) => e.stopPropagation()}
+        >
+          {record.last_name || "-"}
+        </Link>
+      ),
     },
     {
       source: "email_jsonb",
       label: translate("resources.contacts.fields.email"),
-      editable: false, // JSONB-Felder sind nicht direkt editierbar
+      editable: true,
+      type: "text",
       sortable: false,
       render: (record) => getFirstEmail(record.email_jsonb),
+      getEditValue: (record: Contact) => {
+        if (!record.email_jsonb || !Array.isArray(record.email_jsonb) || record.email_jsonb.length === 0) {
+          return "";
+        }
+        return record.email_jsonb[0]?.email || "";
+      },
+      transformValue: (value: unknown, record: Contact) => {
+        const emailStr = value as string;
+        const existing = record.email_jsonb && Array.isArray(record.email_jsonb) ? [...record.email_jsonb] : [];
+        if (existing.length === 0) {
+          if (!emailStr) return { email_jsonb: [] };
+          return { email_jsonb: [{ email: emailStr, type: "Work" }] };
+        }
+        existing[0] = { ...existing[0], email: emailStr };
+        return { email_jsonb: existing };
+      },
     },
     {
       source: "company_id",
@@ -124,10 +157,27 @@ export const ContactDataGrid = () => {
     {
       source: "phone_jsonb",
       label: translate("resources.contacts.fields.phone_number"),
-      editable: false, // JSONB-Felder sind nicht direkt editierbar
+      editable: true,
+      type: "text",
       sortable: false,
       defaultHidden: true,
       render: (record) => getFirstPhone(record.phone_jsonb),
+      getEditValue: (record: Contact) => {
+        if (!record.phone_jsonb || !Array.isArray(record.phone_jsonb) || record.phone_jsonb.length === 0) {
+          return "";
+        }
+        return record.phone_jsonb[0]?.number || "";
+      },
+      transformValue: (value: unknown, record: Contact) => {
+        const phoneStr = value as string;
+        const existing = record.phone_jsonb && Array.isArray(record.phone_jsonb) ? [...record.phone_jsonb] : [];
+        if (existing.length === 0) {
+          if (!phoneStr) return { phone_jsonb: [] };
+          return { phone_jsonb: [{ number: phoneStr, type: "Work" }] };
+        }
+        existing[0] = { ...existing[0], number: phoneStr };
+        return { phone_jsonb: existing };
+      },
     },
     {
       source: "title",
@@ -145,6 +195,12 @@ export const ContactDataGrid = () => {
     },
   ], [translate, companies, sales]);
 
+  // Merge static columns with dynamic custom field columns
+  const allColumns = useMemo(() => [
+    ...columns,
+    ...customFieldCols,
+  ], [columns, customFieldCols]);
+
   return (
     <div className="p-6">
       <div className="mb-6">
@@ -157,14 +213,26 @@ export const ContactDataGrid = () => {
       </div>
 
       <EditableDataGrid<Contact>
-        columns={columns}
+        columns={allColumns}
         resource="contacts"
         defaultSort={{ field: "last_name", order: "ASC" }}
         onCreate={() => navigate("/contacts/create")}
         bulkActions={true}
         enableSoftDelete={false}
-        storeKey="datagrid_contacts_v2" // Neuer Key um alte localStorage-Einstellungen zu überschreiben
+        storeKey="datagrid_contacts_v2"
+        onRowClick={(record) => {
+          setEditSheetContactId(record.id as number);
+          setEditSheetOpen(true);
+        }}
       />
+
+      {editSheetContactId && (
+        <ContactEditSheet
+          open={editSheetOpen}
+          onOpenChange={setEditSheetOpen}
+          contactId={editSheetContactId}
+        />
+      )}
     </div>
   );
 };

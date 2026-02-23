@@ -21,6 +21,8 @@ const Header = () => {
     currentPath = "/contacts-quickview";
   } else if (matchPath("/contacts/*", location.pathname)) {
     currentPath = "/contacts";
+  } else if (matchPath("/companies-quickview", location.pathname)) {
+    currentPath = "/companies-quickview";
   } else if (matchPath("/companies/*", location.pathname)) {
     currentPath = "/companies";
   } else if (matchPath("/deals/*", location.pathname)) {
@@ -72,6 +74,11 @@ const Header = () => {
                     label={translate("crm.companies")}
                     to="/companies"
                     isActive={currentPath === "/companies"}
+                  />
+                  <NavigationTab
+                    label={translate("crm.companies_quickview", { _: "Unternehmen (Quickview)" })}
+                    to="/companies-quickview"
+                    isActive={currentPath === "/companies-quickview"}
                   />
                   <NavigationTab
                     label={translate("crm.deals")}

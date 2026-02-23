@@ -23,6 +23,7 @@ const MobileDashboard = lazy(() => import("../dashboard/MobileDashboard").then(m
 const SettingsPage = lazy(() => import("../settings/SettingsPage").then(m => ({ default: m.SettingsPage })));
 const ImportPage = lazy(() => import("../misc/ImportPage").then(m => ({ default: m.ImportPage })));
 const ContactDataGrid = lazy(() => import("../contacts/ContactDataGrid").then(m => ({ default: m.ContactDataGrid })));
+const CompanyDataGrid = lazy(() => import("../companies/CompanyDataGrid").then(m => ({ default: m.CompanyDataGrid })));
 const ContactShow = lazy(() => import("../contacts/ContactShow").then(m => ({ default: m.ContactShow })));
 const CompanyShow = lazy(() => import("../companies/CompanyShow").then(m => ({ default: m.CompanyShow })));
 const NoteShowPage = lazy(() => import("../notes/NoteShowPage").then(m => ({ default: m.NoteShowPage })));
@@ -166,6 +167,7 @@ const DesktopAdmin = (props: CoreAdminProps) => {
         <Route path="/import" element={<SuspenseWrapper><ImportPage /></SuspenseWrapper>} />
         <Route path="/admin/settings" element={<SuspenseWrapper><AdminSettingsPage /></SuspenseWrapper>} />
         <Route path="/contacts-quickview" element={<SuspenseWrapper><ContactDataGrid /></SuspenseWrapper>} />
+        <Route path="/companies-quickview" element={<SuspenseWrapper><CompanyDataGrid /></SuspenseWrapper>} />
       </CustomRoutes>
       <Resource name="deals" {...deals} />
       <Resource name="contacts" {...contacts} />
@@ -181,6 +183,12 @@ const DesktopAdmin = (props: CoreAdminProps) => {
       <Resource name="team_members" />
       <Resource name="audit_logs" />
       <Resource name="record_versions" />
+      <Resource name="custom_object_definitions" />
+      <Resource name="custom_field_definitions" />
+      <Resource name="custom_field_values" />
+      <Resource name="custom_object_data" />
+      <Resource name="object_relationships" />
+      <Resource name="relationship_definitions" />
     </Admin>
   );
 };

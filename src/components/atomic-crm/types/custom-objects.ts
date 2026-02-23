@@ -113,6 +113,16 @@ export interface ObjectRelationship {
   metadata: Record<string, unknown> | null;
 }
 
+export interface RelationshipDefinition {
+  id: number;
+  source_object_type: string;
+  target_object_type: string;
+  relationship_name: string;
+  inverse_name: string | null;
+  cardinality: "one-to-one" | "one-to-many" | "many-to-many";
+  created_at: string;
+}
+
 // Formular-Typen für UI
 export interface CustomObjectFormData {
   name: string;
