@@ -5,7 +5,7 @@ import {
   Resource,
   type AuthProvider,
 } from "ra-core";
-import { useEffect, lazy, Suspense } from "react";
+import { useEffect, useMemo, lazy, Suspense } from "react";
 import { Route } from "react-router";
 import { QueryClient } from "@tanstack/react-query";
 import { PersistQueryClientProvider } from "@tanstack/react-query-persist-client";
@@ -43,7 +43,9 @@ import {
 } from "../providers/supabase";
 import sales from "../sales";
 import type { ConfigurationContextValue } from "./ConfigurationContext";
-import { ConfigurationProvider } from "./ConfigurationContext";
+import { ConfigurationProvider, CONFIGURATION_STORE_KEY } from "./ConfigurationContext";
+import type { CrmDataProvider } from "../providers/types";
+import { ProfilePage } from "../settings/ProfilePage";
 import {
   defaultCompanySectors,
   defaultDarkModeLogo,
@@ -219,8 +221,6 @@ const DesktopAdmin = (props: CoreAdminProps) => {
         <Route path="/contacts-quickview" element={<SuspenseWrapper><ContactDataGrid /></SuspenseWrapper>} />
         <Route path="/companies-quickview" element={<SuspenseWrapper><CompanyDataGrid /></SuspenseWrapper>} />
         <Route path={ProfilePage.path} element={<ProfilePage />} />
-        <Route path={SettingsPage.path} element={<SettingsPage />} />
-        <Route path={ImportPage.path} element={<ImportPage />} />
       </CustomRoutes>
       <Resource name="deals" {...deals} />
       <Resource name="contacts" {...contacts} />

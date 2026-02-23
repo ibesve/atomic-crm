@@ -143,15 +143,15 @@ const UsersMenu = () => {
   );
 };
 
-const SettingsMenu = () => {
+const ProfileMenu = () => {
   const userMenuContext = useUserMenu();
   const translate = useTranslate();
   if (!userMenuContext) {
-    throw new Error("<SettingsMenu> must be used inside <UserMenu>");
+    throw new Error("<ProfileMenu> must be used inside <UserMenu>");
   }
   return (
     <DropdownMenuItem asChild onClick={userMenuContext.onClose}>
-      <Link to="/settings" className="flex items-center gap-2">
+      <Link to="/profile" className="flex items-center gap-2">
         <Settings />
         {translate("crm.my_info")}
       </Link>

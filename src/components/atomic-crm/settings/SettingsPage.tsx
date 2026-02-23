@@ -1,45 +1,40 @@
-import { useMutation } from "@tanstack/react-query";
-import { 
-  CircleX, 
-  Copy, 
-  Pencil, 
-  Save, 
-  User, 
-  Bell, 
-  Palette, 
+import {
+  Bell,
+  Check,
   Languages,
+  Link2,
+  Monitor,
+  Moon,
+  Palette,
+  RotateCcw,
+  Save,
   Settings,
   Sun,
-  Moon,
-  Monitor,
-  Check,
-  Link2,
 } from "lucide-react";
+import type { RaRecord } from "ra-core";
 import {
+  EditBase,
   Form,
-  useDataProvider,
-  useGetIdentity,
-  useGetOne,
+  useGetList,
+  useInput,
   useNotify,
-  useRecordContext,
   useTranslate,
 } from "ra-core";
-import { useState, useEffect } from "react";
-import { useFormState } from "react-hook-form";
-import { RecordField } from "@/components/admin/record-field";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { useFormContext } from "react-hook-form";
 import { TextInput } from "@/components/admin/text-input";
+import { ArrayInput } from "@/components/admin/array-input";
+import { SimpleFormIterator } from "@/components/admin/simple-form-iterator";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Switch } from "@/components/ui/switch";
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
-import { 
+import {
   Select,
   SelectContent,
   SelectItem,
@@ -47,38 +42,22 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
-import ImageEditorField from "../misc/ImageEditorField";
-import { RelationshipDefinitionManager } from "../custom-objects/RelationshipDefinitionManager";
-import type { CrmDataProvider } from "../providers/types";
-import type { Sale, SalesFormData } from "../types";
-import { RotateCcw, Save } from "lucide-react";
-import type { RaRecord } from "ra-core";
-import { EditBase, Form, useGetList, useInput, useNotify } from "ra-core";
-import { useCallback, useMemo } from "react";
-import { useFormContext } from "react-hook-form";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
-import { Separator } from "@/components/ui/separator";
-import { toSlug } from "@/lib/toSlug";
-import { ArrayInput } from "@/components/admin/array-input";
-import { SimpleFormIterator } from "@/components/admin/simple-form-iterator";
-import { TextInput } from "@/components/admin/text-input";
+import { Switch } from "@/components/ui/switch";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 import ImageEditorField from "../misc/ImageEditorField";
+import { RelationshipDefinitionManager } from "../custom-objects/RelationshipDefinitionManager";
 import {
   useConfigurationContext,
   useConfigurationUpdater,
   type ConfigurationContextValue,
 } from "../root/ConfigurationContext";
 import { defaultConfiguration } from "../root/defaultConfiguration";
+import { toSlug } from "@/lib/toSlug";
 
-const SECTIONS = [
-  { id: "branding", label: "Branding" },
-  { id: "companies", label: "Companies" },
-  { id: "deals", label: "Deals" },
-  { id: "notes", label: "Notes" },
-  { id: "tasks", label: "Tasks" },
-];
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
 
 /** Ensure every item in a { value, label } array has a value (slug from label). */
 const ensureValues = (items: { value?: string; label: string }[] | undefined) =>
@@ -139,10 +118,12 @@ const transformFormValues = (data: Record<string, any>) => ({
   } as ConfigurationContextValue,
 });
 
-// Theme types
+// ---------------------------------------------------------------------------
+// Theme hook
+// ---------------------------------------------------------------------------
+
 type Theme = "light" | "dark" | "system";
 
-// Hook für Theme-Management
 const useTheme = () => {
   const [theme, setThemeState] = useState<Theme>(() => {
     if (typeof window !== "undefined") {
@@ -156,7 +137,8 @@ const useTheme = () => {
     root.classList.remove("light", "dark");
 
     if (theme === "system") {
-      const systemTheme = window.matchMedia("(prefers-color-scheme: dark)").matches
+      const systemTheme = window.matchMedia("(prefers-color-scheme: dark)")
+        .matches
         ? "dark"
         : "light";
       root.classList.add(systemTheme);
@@ -170,20 +152,25 @@ const useTheme = () => {
   return { theme, setTheme: setThemeState };
 };
 
-// Hook für Benutzereinstellungen
+// ---------------------------------------------------------------------------
+// User‑settings hook (notifications, language)
+// ---------------------------------------------------------------------------
+
 const useUserSettings = () => {
   const [settings, setSettings] = useState(() => {
     if (typeof window !== "undefined") {
       const saved = localStorage.getItem("userSettings");
-      return saved ? JSON.parse(saved) : {
-        notifications: {
-          emailNewDeals: true,
-          emailTaskReminders: true,
-          emailWeeklyReport: false,
-          browserNotifications: true,
-        },
-        language: "de",
-      };
+      return saved
+        ? JSON.parse(saved)
+        : {
+            notifications: {
+              emailNewDeals: true,
+              emailTaskReminders: true,
+              emailWeeklyReport: false,
+              browserNotifications: true,
+            },
+            language: "de",
+          };
     }
     return {
       notifications: {
@@ -204,82 +191,16 @@ const useUserSettings = () => {
   return { settings, updateSettings };
 };
 
+// ---------------------------------------------------------------------------
+// SettingsPage (main export)
+// ---------------------------------------------------------------------------
+
 export const SettingsPage = () => {
   const translate = useTranslate();
-  const [isEditMode, setEditMode] = useState(false);
-  const { identity, refetch: refetchIdentity } = useGetIdentity();
-  const { data, refetch: refetchUser } = useGetOne("sales", {
-    id: identity?.id,
-  });
   const notify = useNotify();
-  const dataProvider = useDataProvider<CrmDataProvider>();
+  const updateConfiguration = useConfigurationUpdater();
   const { theme, setTheme } = useTheme();
   const { settings, updateSettings } = useUserSettings();
-
-  const { mutate } = useMutation({
-    mutationKey: ["signup"],
-    mutationFn: async (data: SalesFormData) => {
-      if (!identity) {
-        throw new Error("Record not found");
-      }
-      return dataProvider.salesUpdate(identity.id, data);
-    },
-    onSuccess: () => {
-      refetchIdentity();
-      refetchUser();
-      setEditMode(false);
-      notify(translate("crm.settings.profile_updated", { _: "Profil wurde aktualisiert" }));
-    },
-    onError: (_) => {
-      notify(translate("crm.settings.error", { _: "Ein Fehler ist aufgetreten. Bitte versuchen Sie es erneut." }), {
-        type: "error",
-      });
-    },
-  });
-  const updateConfiguration = useConfigurationUpdater();
-  const notify = useNotify();
-
-  return (
-    <EditBase
-      resource="configuration"
-      id={1}
-      mutationMode="pessimistic"
-      redirect={false}
-      transform={transformFormValues}
-      mutationOptions={{
-        onSuccess: (data: any) => {
-          updateConfiguration(data.config);
-          notify("Configuration saved successfully");
-        },
-        onError: () => {
-          notify("Failed to save configuration", { type: "error" });
-        },
-      }}
-    >
-      <SettingsForm />
-    </EditBase>
-  );
-};
-
-SettingsPage.path = "/settings";
-
-const SettingsForm = () => {
-  const config = useConfigurationContext();
-
-  const defaultValues = useMemo(
-    () => ({
-      title: config.title,
-      lightModeLogo: { src: config.lightModeLogo },
-      darkModeLogo: { src: config.darkModeLogo },
-      companySectors: config.companySectors,
-      dealCategories: config.dealCategories,
-      taskTypes: config.taskTypes,
-      dealStages: config.dealStages,
-      dealPipelineStatuses: config.dealPipelineStatuses,
-      noteStatuses: config.noteStatuses,
-    }),
-    [config],
-  );
 
   const handleNotificationChange = (key: string, value: boolean) => {
     updateSettings({
@@ -289,7 +210,11 @@ const SettingsForm = () => {
         [key]: value,
       },
     });
-    notify(translate("crm.settings.settings_saved", { _: "Einstellungen gespeichert" }));
+    notify(
+      translate("crm.settings.settings_saved", {
+        _: "Einstellungen gespeichert",
+      }),
+    );
   };
 
   const handleLanguageChange = (value: string) => {
@@ -297,7 +222,11 @@ const SettingsForm = () => {
       ...settings,
       language: value,
     });
-    notify(translate("crm.settings.language_changed", { _: "Sprache wurde geändert. Änderungen werden nach dem Neuladen wirksam." }));
+    notify(
+      translate("crm.settings.language_changed", {
+        _: "Sprache wurde geändert. Änderungen werden nach dem Neuladen wirksam.",
+      }),
+    );
   };
 
   return (
@@ -312,24 +241,30 @@ const SettingsForm = () => {
             {translate("crm.settings.title", { _: "Einstellungen" })}
           </h1>
           <p className="text-muted-foreground">
-            {translate("crm.settings.subtitle", { _: "Verwalten Sie Ihr Profil und Ihre Präferenzen" })}
+            {translate("crm.settings.subtitle", {
+              _: "Verwalten Sie Ihre Präferenzen und Konfiguration",
+            })}
           </p>
         </div>
       </div>
 
       {/* Tabs */}
-      <Tabs defaultValue="profile" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-5">
-          <TabsTrigger value="profile" className="gap-2">
-            <User className="w-4 h-4" />
+      <Tabs defaultValue="configuration" className="space-y-6">
+        <TabsList className="grid w-full grid-cols-4">
+          <TabsTrigger value="configuration" className="gap-2">
+            <Settings className="w-4 h-4" />
             <span className="hidden sm:inline">
-              {translate("crm.settings.profile", { _: "Profil" })}
+              {translate("crm.settings.configuration", {
+                _: "Konfiguration",
+              })}
             </span>
           </TabsTrigger>
           <TabsTrigger value="notifications" className="gap-2">
             <Bell className="w-4 h-4" />
             <span className="hidden sm:inline">
-              {translate("crm.settings.notifications", { _: "Benachrichtigungen" })}
+              {translate("crm.settings.notifications", {
+                _: "Benachrichtigungen",
+              })}
             </span>
           </TabsTrigger>
           <TabsTrigger value="appearance" className="gap-2">
@@ -344,110 +279,155 @@ const SettingsForm = () => {
               {translate("crm.settings.language", { _: "Sprache" })}
             </span>
           </TabsTrigger>
-          <TabsTrigger value="custom-objects" className="gap-2">
-            <Link2 className="w-4 h-4" />
-            <span className="hidden sm:inline">
-              {translate("crm.settings.custom_objects", { _: "Beziehungen" })}
-            </span>
-          </TabsTrigger>
         </TabsList>
 
-        {/* Profil Tab */}
-        <TabsContent value="profile">
-          <Form onSubmit={handleOnSubmit} record={data}>
-            <ProfileForm isEditMode={isEditMode} setEditMode={setEditMode} />
-          </Form>
+        {/* Configuration Tab */}
+        <TabsContent value="configuration">
+          <EditBase
+            resource="configuration"
+            id={1}
+            mutationMode="pessimistic"
+            redirect={false}
+            transform={transformFormValues}
+            mutationOptions={{
+              onSuccess: (data: any) => {
+                updateConfiguration(data.config);
+                notify("Configuration saved successfully");
+              },
+              onError: () => {
+                notify("Failed to save configuration", { type: "error" });
+              },
+            }}
+          >
+            <ConfigurationForm />
+          </EditBase>
         </TabsContent>
 
-        {/* Benachrichtigungen Tab */}
+        {/* Notifications Tab */}
         <TabsContent value="notifications">
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Bell className="w-5 h-5" />
-                {translate("crm.settings.notification_preferences", { _: "Benachrichtigungseinstellungen" })}
+                {translate("crm.settings.notification_preferences", {
+                  _: "Benachrichtigungseinstellungen",
+                })}
               </CardTitle>
               <CardDescription>
-                {translate("crm.settings.notification_description", { _: "Legen Sie fest, wie und wann Sie benachrichtigt werden möchten." })}
+                {translate("crm.settings.notification_description", {
+                  _: "Legen Sie fest, wie und wann Sie benachrichtigt werden möchten.",
+                })}
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
-              {/* E-Mail Benachrichtigungen */}
+              {/* E-Mail Notifications */}
               <div>
                 <h3 className="text-lg font-medium mb-4">
-                  {translate("crm.settings.email_notifications", { _: "E-Mail-Benachrichtigungen" })}
+                  {translate("crm.settings.email_notifications", {
+                    _: "E-Mail-Benachrichtigungen",
+                  })}
                 </h3>
                 <div className="space-y-4">
                   <div className="flex items-center justify-between">
                     <div className="space-y-0.5">
                       <Label htmlFor="emailNewDeals">
-                        {translate("crm.settings.new_deals", { _: "Neue Deals" })}
+                        {translate("crm.settings.new_deals", {
+                          _: "Neue Deals",
+                        })}
                       </Label>
                       <p className="text-sm text-muted-foreground">
-                        {translate("crm.settings.new_deals_description", { _: "Erhalten Sie eine E-Mail, wenn ein neuer Deal erstellt wird." })}
+                        {translate("crm.settings.new_deals_description", {
+                          _: "Erhalten Sie eine E-Mail, wenn ein neuer Deal erstellt wird.",
+                        })}
                       </p>
                     </div>
                     <Switch
                       id="emailNewDeals"
                       checked={settings.notifications.emailNewDeals}
-                      onCheckedChange={(value) => handleNotificationChange("emailNewDeals", value)}
+                      onCheckedChange={(value) =>
+                        handleNotificationChange("emailNewDeals", value)
+                      }
                     />
                   </div>
                   <Separator />
                   <div className="flex items-center justify-between">
                     <div className="space-y-0.5">
                       <Label htmlFor="emailTaskReminders">
-                        {translate("crm.settings.task_reminders", { _: "Aufgaben-Erinnerungen" })}
+                        {translate("crm.settings.task_reminders", {
+                          _: "Aufgaben-Erinnerungen",
+                        })}
                       </Label>
                       <p className="text-sm text-muted-foreground">
-                        {translate("crm.settings.task_reminders_description", { _: "Erhalten Sie Erinnerungen für anstehende Aufgaben." })}
+                        {translate("crm.settings.task_reminders_description", {
+                          _: "Erhalten Sie Erinnerungen für anstehende Aufgaben.",
+                        })}
                       </p>
                     </div>
                     <Switch
                       id="emailTaskReminders"
                       checked={settings.notifications.emailTaskReminders}
-                      onCheckedChange={(value) => handleNotificationChange("emailTaskReminders", value)}
+                      onCheckedChange={(value) =>
+                        handleNotificationChange("emailTaskReminders", value)
+                      }
                     />
                   </div>
                   <Separator />
                   <div className="flex items-center justify-between">
                     <div className="space-y-0.5">
                       <Label htmlFor="emailWeeklyReport">
-                        {translate("crm.settings.weekly_report", { _: "Wöchentlicher Bericht" })}
+                        {translate("crm.settings.weekly_report", {
+                          _: "Wöchentlicher Bericht",
+                        })}
                       </Label>
                       <p className="text-sm text-muted-foreground">
-                        {translate("crm.settings.weekly_report_description", { _: "Erhalten Sie eine wöchentliche Zusammenfassung Ihrer Aktivitäten." })}
+                        {translate("crm.settings.weekly_report_description", {
+                          _: "Erhalten Sie eine wöchentliche Zusammenfassung Ihrer Aktivitäten.",
+                        })}
                       </p>
                     </div>
                     <Switch
                       id="emailWeeklyReport"
                       checked={settings.notifications.emailWeeklyReport}
-                      onCheckedChange={(value) => handleNotificationChange("emailWeeklyReport", value)}
+                      onCheckedChange={(value) =>
+                        handleNotificationChange("emailWeeklyReport", value)
+                      }
                     />
                   </div>
                 </div>
               </div>
-              
+
               <Separator />
-              
-              {/* Browser Benachrichtigungen */}
+
+              {/* Browser Notifications */}
               <div>
                 <h3 className="text-lg font-medium mb-4">
-                  {translate("crm.settings.browser_notifications", { _: "Browser-Benachrichtigungen" })}
+                  {translate("crm.settings.browser_notifications", {
+                    _: "Browser-Benachrichtigungen",
+                  })}
                 </h3>
                 <div className="flex items-center justify-between">
                   <div className="space-y-0.5">
                     <Label htmlFor="browserNotifications">
-                      {translate("crm.settings.enable_browser_notifications", { _: "Browser-Benachrichtigungen aktivieren" })}
+                      {translate(
+                        "crm.settings.enable_browser_notifications",
+                        { _: "Browser-Benachrichtigungen aktivieren" },
+                      )}
                     </Label>
                     <p className="text-sm text-muted-foreground">
-                      {translate("crm.settings.browser_notifications_description", { _: "Erhalten Sie Desktop-Benachrichtigungen im Browser." })}
+                      {translate(
+                        "crm.settings.browser_notifications_description",
+                        {
+                          _: "Erhalten Sie Desktop-Benachrichtigungen im Browser.",
+                        },
+                      )}
                     </p>
                   </div>
                   <Switch
                     id="browserNotifications"
                     checked={settings.notifications.browserNotifications}
-                    onCheckedChange={(value) => handleNotificationChange("browserNotifications", value)}
+                    onCheckedChange={(value) =>
+                      handleNotificationChange("browserNotifications", value)
+                    }
                   />
                 </div>
               </div>
@@ -455,16 +435,20 @@ const SettingsForm = () => {
           </Card>
         </TabsContent>
 
-        {/* Darstellung Tab */}
+        {/* Appearance Tab */}
         <TabsContent value="appearance">
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Palette className="w-5 h-5" />
-                {translate("crm.settings.appearance_settings", { _: "Darstellungseinstellungen" })}
+                {translate("crm.settings.appearance_settings", {
+                  _: "Darstellungseinstellungen",
+                })}
               </CardTitle>
               <CardDescription>
-                {translate("crm.settings.appearance_description", { _: "Passen Sie das Erscheinungsbild der Anwendung an." })}
+                {translate("crm.settings.appearance_description", {
+                  _: "Passen Sie das Erscheinungsbild der Anwendung an.",
+                })}
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
@@ -478,24 +462,39 @@ const SettingsForm = () => {
                     currentTheme={theme}
                     onSelect={setTheme}
                     icon={<Sun className="w-6 h-6" />}
-                    label={translate("crm.settings.theme_light", { _: "Hell" })}
-                    description={translate("crm.settings.theme_light_description", { _: "Helles Farbschema" })}
+                    label={translate("crm.settings.theme_light", {
+                      _: "Hell",
+                    })}
+                    description={translate(
+                      "crm.settings.theme_light_description",
+                      { _: "Helles Farbschema" },
+                    )}
                   />
                   <ThemeOption
                     value="dark"
                     currentTheme={theme}
                     onSelect={setTheme}
                     icon={<Moon className="w-6 h-6" />}
-                    label={translate("crm.settings.theme_dark", { _: "Dunkel" })}
-                    description={translate("crm.settings.theme_dark_description", { _: "Dunkles Farbschema" })}
+                    label={translate("crm.settings.theme_dark", {
+                      _: "Dunkel",
+                    })}
+                    description={translate(
+                      "crm.settings.theme_dark_description",
+                      { _: "Dunkles Farbschema" },
+                    )}
                   />
                   <ThemeOption
                     value="system"
                     currentTheme={theme}
                     onSelect={setTheme}
                     icon={<Monitor className="w-6 h-6" />}
-                    label={translate("crm.settings.theme_system", { _: "System" })}
-                    description={translate("crm.settings.theme_system_description", { _: "Automatisch" })}
+                    label={translate("crm.settings.theme_system", {
+                      _: "System",
+                    })}
+                    description={translate(
+                      "crm.settings.theme_system_description",
+                      { _: "Automatisch" },
+                    )}
                   />
                 </div>
               </div>
@@ -503,28 +502,36 @@ const SettingsForm = () => {
           </Card>
         </TabsContent>
 
-        {/* Sprache Tab */}
+        {/* Language Tab */}
         <TabsContent value="language">
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Languages className="w-5 h-5" />
-                {translate("crm.settings.language_settings", { _: "Spracheinstellungen" })}
+                {translate("crm.settings.language_settings", {
+                  _: "Spracheinstellungen",
+                })}
               </CardTitle>
               <CardDescription>
-                {translate("crm.settings.language_description", { _: "Wählen Sie Ihre bevorzugte Sprache für die Benutzeroberfläche." })}
+                {translate("crm.settings.language_description", {
+                  _: "Wählen Sie Ihre bevorzugte Sprache für die Benutzeroberfläche.",
+                })}
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
               <div>
                 <Label htmlFor="language" className="text-lg font-medium">
-                  {translate("crm.settings.select_language", { _: "Sprache auswählen" })}
+                  {translate("crm.settings.select_language", {
+                    _: "Sprache auswählen",
+                  })}
                 </Label>
                 <p className="text-sm text-muted-foreground mb-4">
-                  {translate("crm.settings.language_info", { _: "Weitere Sprachen werden in zukünftigen Updates verfügbar sein." })}
+                  {translate("crm.settings.language_info", {
+                    _: "Weitere Sprachen werden in zukünftigen Updates verfügbar sein.",
+                  })}
                 </p>
-                <Select 
-                  value={settings.language} 
+                <Select
+                  value={settings.language}
                   onValueChange={handleLanguageChange}
                 >
                   <SelectTrigger className="w-full max-w-xs">
@@ -552,17 +559,17 @@ const SettingsForm = () => {
             </CardContent>
           </Card>
         </TabsContent>
-
-        {/* Custom Objects & Beziehungen Tab */}
-        <TabsContent value="custom-objects">
-          <RelationshipDefinitionManager />
-        </TabsContent>
       </Tabs>
     </div>
   );
 };
 
-// Theme Option Component
+SettingsPage.path = "/settings";
+
+// ---------------------------------------------------------------------------
+// ThemeOption component
+// ---------------------------------------------------------------------------
+
 const ThemeOption = ({
   value,
   currentTheme,
@@ -579,7 +586,7 @@ const ThemeOption = ({
   description: string;
 }) => {
   const isSelected = currentTheme === value;
-  
+
   return (
     <button
       type="button"
@@ -595,77 +602,58 @@ const ThemeOption = ({
           <Check className="w-4 h-4 text-primary" />
         </div>
       )}
-      <div className={`mb-2 ${isSelected ? "text-primary" : "text-muted-foreground"}`}>
+      <div
+        className={`mb-2 ${isSelected ? "text-primary" : "text-muted-foreground"}`}
+      >
         {icon}
       </div>
       <span className={`font-medium ${isSelected ? "text-primary" : ""}`}>
         {label}
       </span>
-      <span className="text-xs text-muted-foreground mt-1">
-        {description}
-      </span>
+      <span className="text-xs text-muted-foreground mt-1">{description}</span>
     </button>
   );
 };
 
-// Profil Form Component (aus der ursprünglichen SettingsForm extrahiert)
-const ProfileForm = ({
-  isEditMode,
-  setEditMode,
-}: {
-  isEditMode: boolean;
-  setEditMode: (value: boolean) => void;
-}) => {
-  const notify = useNotify();
-  const translate = useTranslate();
-  const record = useRecordContext<Sale>();
-  const { identity, refetch } = useGetIdentity();
-  const { isDirty } = useFormState();
-  const dataProvider = useDataProvider<CrmDataProvider>();
+// ---------------------------------------------------------------------------
+// Configuration form (EditBase child)
+// ---------------------------------------------------------------------------
 
-  const { mutate: updatePassword } = useMutation({
-    mutationKey: ["updatePassword"],
-    mutationFn: async () => {
-      if (!identity) {
-        throw new Error("Record not found");
-      }
-      return dataProvider.updatePassword(identity.id);
-    },
-    onSuccess: () => {
-      notify(translate("crm.settings.password_reset_sent", { _: "Eine E-Mail zum Zurücksetzen des Passworts wurde gesendet." }));
-    },
-    onError: (e) => {
-      notify(`${e}`, {
-        type: "error",
-      });
-    },
-  });
+const SECTIONS = [
+  { id: "branding", label: "Branding" },
+  { id: "companies", label: "Companies" },
+  { id: "deals", label: "Deals" },
+  { id: "notes", label: "Notes" },
+  { id: "tasks", label: "Tasks" },
+  { id: "relationships", label: "Relationships" },
+];
 
-  const { mutate: mutateSale } = useMutation({
-    mutationKey: ["signup"],
-    mutationFn: async (data: SalesFormData) => {
-      if (!record) {
-        throw new Error("Record not found");
-      }
-      return dataProvider.salesUpdate(record.id, data);
-    },
-    onSuccess: () => {
-      refetch();
-      notify(translate("crm.settings.profile_updated", { _: "Profil wurde aktualisiert" }));
-    },
-    onError: () => {
-      notify(translate("crm.settings.error", { _: "Ein Fehler ist aufgetreten. Bitte versuchen Sie es erneut." }));
-    },
-  });
+const ConfigurationForm = () => {
+  const config = useConfigurationContext();
 
-  if (!identity) return null;
+  const defaultValues = useMemo(
+    () => ({
+      title: config.title,
+      lightModeLogo: { src: config.lightModeLogo },
+      darkModeLogo: { src: config.darkModeLogo },
+      companySectors: config.companySectors,
+      dealCategories: config.dealCategories,
+      taskTypes: config.taskTypes,
+      dealStages: config.dealStages,
+      dealPipelineStatuses: config.dealPipelineStatuses,
+      noteStatuses: config.noteStatuses,
+    }),
+    [config],
+  );
+
+  return (
     <Form defaultValues={defaultValues}>
-      <SettingsFormFields />
+      <ConfigurationFormFields />
     </Form>
   );
 };
 
-const SettingsFormFields = () => {
+const ConfigurationFormFields = () => {
   const {
     watch,
     setValue,
@@ -693,56 +681,10 @@ const SettingsFormFields = () => {
   );
 
   return (
-    <div className="space-y-4">
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <User className="w-5 h-5" />
-            {translate("crm.settings.my_profile", { _: "Mein Profil" })}
-          </CardTitle>
-          <CardDescription>
-            {translate("crm.settings.profile_description", { _: "Verwalten Sie Ihre persönlichen Informationen." })}
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-4 mb-4">
-            <ImageEditorField
-              source="avatar"
-              type="avatar"
-              onSave={handleAvatarUpdate}
-              linkPosition="right"
-            />
-            <TextRender 
-              source="first_name" 
-              isEditMode={isEditMode} 
-              label={translate("crm.settings.first_name", { _: "Vorname" })}
-            />
-            <TextRender 
-              source="last_name" 
-              isEditMode={isEditMode} 
-              label={translate("crm.settings.last_name", { _: "Nachname" })}
-            />
-            <TextRender 
-              source="email" 
-              isEditMode={isEditMode} 
-              label={translate("crm.settings.email", { _: "E-Mail" })}
-            />
-          </div>
-          <div className="flex flex-row justify-end gap-2">
-            {!isEditMode && (
-              <Button
-                variant="outline"
-                type="button"
-                onClick={handleClickOpenPasswordChange}
-              >
-                {translate("crm.settings.change_password", { _: "Passwort ändern" })}
-              </Button>
-            )}
     <div className="flex gap-8 mt-4 pb-20">
       {/* Left navigation */}
       <nav className="hidden md:block w-48 shrink-0">
         <div className="sticky top-4 space-y-1">
-          <h1 className="text-2xl font-semibold px-3 mb-2">Settings</h1>
           {SECTIONS.map((section) => (
             <button
               key={section.id}
@@ -771,7 +713,9 @@ const SettingsFormFields = () => {
             <TextInput source="title" label="App Title" />
             <div className="flex gap-8">
               <div className="flex flex-col items-center gap-1">
-                <p className="text-sm text-muted-foreground">Light Mode Logo</p>
+                <p className="text-sm text-muted-foreground">
+                  Light Mode Logo
+                </p>
                 <ImageEditorField
                   source="lightModeLogo"
                   width={100}
@@ -781,7 +725,9 @@ const SettingsFormFields = () => {
                 />
               </div>
               <div className="flex flex-col items-center gap-1">
-                <p className="text-sm text-muted-foreground">Dark Mode Logo</p>
+                <p className="text-sm text-muted-foreground">
+                  Dark Mode Logo
+                </p>
                 <ImageEditorField
                   source="darkModeLogo"
                   width={100}
@@ -919,12 +865,24 @@ const SettingsFormFields = () => {
             <h2 className="text-xl font-semibold text-muted-foreground">
               Tasks
             </h2>
-            <h3 className="text-lg font-medium text-muted-foreground">Types</h3>
+            <h3 className="text-lg font-medium text-muted-foreground">
+              Types
+            </h3>
             <ArrayInput source="taskTypes" label={false} helperText={false}>
               <SimpleFormIterator disableReordering disableClear>
                 <TextInput source="label" label={false} />
               </SimpleFormIterator>
             </ArrayInput>
+          </CardContent>
+        </Card>
+
+        {/* Relationships */}
+        <Card id="relationships">
+          <CardContent className="space-y-4">
+            <h2 className="text-xl font-semibold text-muted-foreground">
+              Relationships
+            </h2>
+            <RelationshipDefinitionManager />
           </CardContent>
         </Card>
       </div>
@@ -947,59 +905,6 @@ const SettingsFormFields = () => {
                 })
               }
             >
-              {isEditMode ? <CircleX className="mr-2 h-4 w-4" /> : <Pencil className="mr-2 h-4 w-4" />}
-              {isEditMode 
-                ? translate("crm.settings.cancel", { _: "Abbrechen" })
-                : translate("crm.settings.edit", { _: "Bearbeiten" })
-              }
-            </Button>
-            {isEditMode && (
-              <Button type="submit" disabled={!isDirty} variant="default">
-                <Save className="mr-2 h-4 w-4" />
-                {translate("crm.settings.save", { _: "Speichern" })}
-              </Button>
-            )}
-          </div>
-        </CardContent>
-      </Card>
-      
-      {import.meta.env.VITE_INBOUND_EMAIL && (
-        <Card>
-          <CardHeader>
-            <CardTitle>
-              {translate("crm.settings.inbound_email", { _: "Eingehende E-Mails" })}
-            </CardTitle>
-            <CardDescription>
-              {translate("crm.settings.inbound_email_description", { 
-                _: "Sie können E-Mails an die Serveradresse senden, z.B. im Cc:-Feld. Atomic CRM verarbeitet die E-Mails und fügt Notizen zu den entsprechenden Kontakten hinzu." 
-              })}
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <CopyPaste />
-          </CardContent>
-        </Card>
-      )}
-    </div>
-  );
-};
-
-const TextRender = ({
-  source,
-  isEditMode,
-  label,
-}: {
-  source: string;
-  isEditMode: boolean;
-  label?: string;
-}) => {
-  if (isEditMode) {
-    return <TextInput source={source} label={label} helperText={false} />;
-  }
-  return (
-    <div className="m-2">
-      {label && <Label className="text-sm text-muted-foreground">{label}</Label>}
-      <RecordField source={source} />
               <RotateCcw className="h-4 w-4 mr-1" />
               Reset to Defaults
             </Button>
@@ -1023,42 +928,10 @@ const TextRender = ({
   );
 };
 
-const CopyPaste = () => {
-  const [copied, setCopied] = useState(false);
-  const translate = useTranslate();
-  
-  const handleCopy = () => {
-    setCopied(true);
-    navigator.clipboard.writeText(import.meta.env.VITE_INBOUND_EMAIL);
-    setTimeout(() => {
-      setCopied(false);
-    }, 1500);
-  };
+// ---------------------------------------------------------------------------
+// Color picker input
+// ---------------------------------------------------------------------------
 
-  return (
-    <TooltipProvider>
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <Button
-            type="button"
-            onClick={handleCopy}
-            variant="ghost"
-            className="normal-case justify-between w-full"
-          >
-            <span className="overflow-hidden text-ellipsis">
-              {import.meta.env.VITE_INBOUND_EMAIL}
-            </span>
-            <Copy className="h-4 w-4 ml-2" />
-          </Button>
-        </TooltipTrigger>
-        <TooltipContent>
-          <p>{copied 
-            ? translate("crm.settings.copied", { _: "Kopiert!" })
-            : translate("crm.settings.copy", { _: "Kopieren" })
-          }</p>
-        </TooltipContent>
-      </Tooltip>
-    </TooltipProvider>
 /** A minimal color picker input compatible with ra-core's useInput. */
 const ColorInput = ({ source }: { source: string }) => {
   const { field } = useInput({ source });
