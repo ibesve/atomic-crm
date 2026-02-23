@@ -132,6 +132,10 @@
           "type": "registry:component"
         },
         {
+          "path": "src/components/atomic-crm/settings/ProfilePage.tsx",
+          "type": "registry:component"
+        },
+        {
           "path": "src/components/atomic-crm/sales/index.ts",
           "type": "registry:component"
         },
@@ -153,6 +157,10 @@
         },
         {
           "path": "src/components/atomic-crm/sales/SaleName.tsx",
+          "type": "registry:component"
+        },
+        {
+          "path": "src/components/atomic-crm/root/useConfigurationLoader.ts",
           "type": "registry:component"
         },
         {
@@ -240,15 +248,7 @@
           "type": "registry:component"
         },
         {
-          "path": "src/components/atomic-crm/providers/fakerest/internal/transformOrFilter.spec.ts",
-          "type": "registry:component"
-        },
-        {
           "path": "src/components/atomic-crm/providers/fakerest/internal/transformInFilter.ts",
-          "type": "registry:component"
-        },
-        {
-          "path": "src/components/atomic-crm/providers/fakerest/internal/transformInFilter.spec.ts",
           "type": "registry:component"
         },
         {
@@ -260,15 +260,7 @@
           "type": "registry:component"
         },
         {
-          "path": "src/components/atomic-crm/providers/fakerest/internal/transformContainsFilter.spec.ts",
-          "type": "registry:component"
-        },
-        {
           "path": "src/components/atomic-crm/providers/fakerest/internal/supabaseAdapter.ts",
-          "type": "registry:component"
-        },
-        {
-          "path": "src/components/atomic-crm/providers/fakerest/internal/supabaseAdapter.spec.ts",
           "type": "registry:component"
         },
         {
@@ -332,15 +324,7 @@
           "type": "registry:component"
         },
         {
-          "path": "src/components/atomic-crm/providers/commons/getContactAvatar.spec.ts",
-          "type": "registry:component"
-        },
-        {
           "path": "src/components/atomic-crm/providers/commons/getCompanyAvatar.ts",
-          "type": "registry:component"
-        },
-        {
-          "path": "src/components/atomic-crm/providers/commons/getCompanyAvatar.spec.ts",
           "type": "registry:component"
         },
         {
@@ -701,6 +685,10 @@
         },
         {
           "path": "src/components/atomic-crm/contacts/exportToVCard.ts",
+          "type": "registry:component"
+        },
+        {
+          "path": "src/components/atomic-crm/contacts/contactGender.ts",
           "type": "registry:component"
         },
         {

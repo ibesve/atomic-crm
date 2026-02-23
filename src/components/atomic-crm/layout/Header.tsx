@@ -1,4 +1,4 @@
-import { Import, Settings, User } from "lucide-react";
+import { Import, Settings, User, Users } from "lucide-react";
 import { CanAccess, useGetIdentity, useTranslate, useUserMenu } from "ra-core";
 import { Link, matchPath, useLocation } from "react-router";
 import { RefreshButton } from "@/components/admin/refresh-button";
@@ -91,7 +91,7 @@ const Header = () => {
                 <ThemeModeToggle />
                 <RefreshButton />
                 <UserMenu>
-                  <ConfigurationMenu />
+                  <ProfileMenu />
                   <CanAccess resource="sales" action="list">
                     <UsersMenu />
                   </CanAccess>
@@ -143,11 +143,11 @@ const UsersMenu = () => {
   );
 };
 
-const ConfigurationMenu = () => {
+const SettingsMenu = () => {
   const userMenuContext = useUserMenu();
   const translate = useTranslate();
   if (!userMenuContext) {
-    throw new Error("<ConfigurationMenu> must be used inside <UserMenu?");
+    throw new Error("<SettingsMenu> must be used inside <UserMenu>");
   }
   return (
     <DropdownMenuItem asChild onClick={userMenuContext.onClose}>

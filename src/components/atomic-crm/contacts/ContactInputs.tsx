@@ -44,7 +44,6 @@ export const ContactInputs = () => {
 };
 
 const ContactIdentityInputs = () => {
-  const { contactGender } = useConfigurationContext();
   return (
     <div className="flex flex-col gap-4">
       <h6 className="text-lg font-semibold">Identität</h6>
