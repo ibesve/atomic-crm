@@ -107,11 +107,9 @@ export const Task = ({
               )}
               {task.text}
             </div>
-            <div className="text-sm text-muted-foreground flex flex-wrap items-center gap-x-2">
-              <span>
-                due&nbsp;
-                <DateField source="due_date" record={task} />
-              </span>
+            <div className="text-sm text-muted-foreground">
+              due&nbsp;
+              <DateField source="due_date" record={task} showDate showTime />
               {showContact && (
                 <ReferenceField<TData, Contact>
                   source="contact_id"
