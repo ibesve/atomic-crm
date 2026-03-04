@@ -1,0 +1,14 @@
+node_modules
+dist
+.git
+.github
+.vscode
+doc
+test-data
+supabase
+demo
+*.md
+!README.md
+.env*
+.husky
+coverage
