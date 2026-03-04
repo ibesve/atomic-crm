@@ -4,6 +4,7 @@ import {
   Sheet,
   SheetClose,
   SheetContent,
+  SheetDescription,
   SheetFooter,
   SheetHeader,
   SheetTitle,
@@ -137,6 +138,9 @@ export const CreateSheet = ({
                   title
                 )}
               </SheetTitle>
+              <SheetDescription className="sr-only">
+                {typeof title === "string" ? title : "Create record"}
+              </SheetDescription>
             </SheetHeader>
 
             <div className="flex-1 overflow-y-auto flex flex-col gap-3 p-4">

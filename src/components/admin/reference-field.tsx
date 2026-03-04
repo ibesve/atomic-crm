@@ -10,33 +10,19 @@ import {
   useGetRecordRepresentation,
   useReferenceFieldContext,
   useTranslate,
+  useGetOne,
+  useRecordContext,
 } from "ra-core";
 import type { MouseEvent, ReactNode } from "react";
+import { useMemo } from "react";
 import { Link } from "react-router";
 import type { UseQueryOptions } from "@tanstack/react-query";
+import { ExternalLink } from "lucide-react";
+import { cn } from "@/lib/utils";
+import { Skeleton } from "@/components/ui/skeleton";
 
 /**
  * Displays a field from a related record by following a foreign key relationship.
- *
- * This field fetches the related record using the foreign key value and displays it using the record representation.
- * It supports linking to the related record's show or edit page.
- * To be used with RecordField or DataTable.Col components, or anywhere a RecordContext is available.
- *
- * @see {@link https://marmelab.com/shadcn-admin-kit/docs/referencefield/ ReferenceField documentation}
- *
- * @example
- * import { List, DataTable, ReferenceField } from '@/components/admin';
- *
- * const PostList = () => (
- *   <List>
- *     <DataTable>
- *       <DataTable.Col source="title" />
- *       <DataTable.Col label="Author">
- *         <ReferenceField source="author_id" reference="authors" link="show" />
- *       </DataTable.Col>
- *     </DataTable>
- *   </List>
- * );
  */
 export const ReferenceField = <
   RecordType extends RaRecord = RaRecord,
@@ -72,8 +58,7 @@ export interface ReferenceFieldProps<
 > extends Partial<ReferenceFieldViewProps<ReferenceRecordType>> {
   children?: ReactNode;
   queryOptions?: UseQueryOptions<RaRecord[], Error> & {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    meta?: any;
+    meta?: Record<string, unknown>;
   };
   record?: RecordType;
   reference: string;
@@ -82,7 +67,6 @@ export interface ReferenceFieldProps<
   source: ExtractRecordPaths<RecordType>;
 }
 
-// useful to prevent click bubbling in a datagrid with rowClick
 const stopPropagation = (e: MouseEvent<HTMLAnchorElement>) =>
   e.stopPropagation();
 
@@ -150,4 +134,102 @@ export interface ReferenceFieldViewProps<
   translateChoice?: ((record: ReferenceRecordType) => string) | boolean;
   resourceLinkPath?: LinkToType;
   error?: ReactNode;
+}
+
+/**
+ * Zeigt mehrere verknüpfte Objekte als klickbare Links an (für Many-to-Many)
+ */
+interface ReferenceManyFieldProps {
+  source: string;
+  reference: string;
+  link?: boolean | "show" | "edit";
+  optionText?: string | ((record: RaRecord) => ReactNode);
+  className?: string;
+  emptyText?: string;
+  separator?: string;
+}
+
+export function ReferenceManyField({
+  source,
+  reference,
+  link = true,
+  optionText = "name",
+  className,
+  emptyText = "-",
+  separator = ", ",
+}: ReferenceManyFieldProps) {
+  const record = useRecordContext();
+  const referenceIds: (string | number)[] = record?.[source] || [];
+
+  if (!referenceIds.length) {
+    return <span className="text-muted-foreground">{emptyText}</span>;
+  }
+
+  return (
+    <span className={cn("inline-flex flex-wrap gap-1", className)}>
+      {referenceIds.map((id, index) => (
+        <span key={id}>
+          <ReferenceManyFieldItem
+            id={id}
+            reference={reference}
+            link={link}
+            optionText={optionText}
+          />
+          {index < referenceIds.length - 1 && separator}
+        </span>
+      ))}
+    </span>
+  );
+}
+
+function ReferenceManyFieldItem({
+  id,
+  reference,
+  link,
+  optionText,
+}: {
+  id: string | number;
+  reference: string;
+  link: boolean | "show" | "edit";
+  optionText: string | ((record: RaRecord) => ReactNode);
+}) {
+  const { data: referencedRecord, isPending } = useGetOne(
+    reference,
+    { id },
+    { enabled: !!id }
+  );
+
+  const displayValue = useMemo(() => {
+    if (!referencedRecord) return null;
+    if (typeof optionText === "function") {
+      return optionText(referencedRecord);
+    }
+    return referencedRecord[optionText];
+  }, [referencedRecord, optionText]);
+
+  if (isPending) {
+    return <Skeleton className="h-4 w-16 inline-block" />;
+  }
+
+  if (!referencedRecord) {
+    return <span>{id}</span>;
+  }
+
+  const linkPath =
+    link === "edit" ? `/${reference}/${id}` : `/${reference}/${id}/show`;
+
+  if (link) {
+    return (
+      <Link
+        to={linkPath}
+        className="text-primary hover:underline inline-flex items-center gap-1"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {displayValue}
+        <ExternalLink className="h-3 w-3" />
+      </Link>
+    );
+  }
+
+  return <span>{displayValue}</span>;
 }

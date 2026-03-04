@@ -1,5 +1,5 @@
 import { useQueryClient } from "@tanstack/react-query";
-import { MoreVertical } from "lucide-react";
+import { MoreVertical, User } from "lucide-react";
 import { useDeleteWithUndoController, useNotify, useUpdate } from "ra-core";
 import { useEffect, useState } from "react";
 import { ReferenceField } from "@/components/admin/reference-field";
@@ -14,7 +14,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 
 import { useConfigurationContext } from "../root/ConfigurationContext";
-import type { Contact, Task as TData } from "../types";
+import type { Contact, Task as TData, Sale } from "../types";
 import { TaskEdit } from "./TaskEdit";
 import { TaskEditSheet } from "./TaskEditSheet";
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -22,9 +22,11 @@ import { useIsMobile } from "@/hooks/use-mobile";
 export const Task = ({
   task,
   showContact,
+  showAssignee = false,
 }: {
   task: TData;
   showContact?: boolean;
+  showAssignee?: boolean;
 }) => {
   const isMobile = useIsMobile();
   const { taskTypes } = useConfigurationContext();
@@ -118,12 +120,29 @@ export const Task = ({
                   render={({ referenceRecord }) => {
                     if (!referenceRecord) return null;
                     return (
-                      <>
-                        {" "}
+                      <span>
                         (Re:&nbsp;
                         {referenceRecord?.first_name}{" "}
                         {referenceRecord?.last_name})
-                      </>
+                      </span>
+                    );
+                  }}
+                />
+              )}
+              {/* Zugewiesener Bearbeiter anzeigen */}
+              {showAssignee && task.sales_id && (
+                <ReferenceField<TData, Sale>
+                  source="sales_id"
+                  reference="sales"
+                  record={task}
+                  className="inline text-sm text-muted-foreground"
+                  render={({ referenceRecord }) => {
+                    if (!referenceRecord) return null;
+                    return (
+                      <span className="flex items-center gap-1">
+                        <User className="w-3 h-3" />
+                        {referenceRecord?.first_name} {referenceRecord?.last_name}
+                      </span>
                     );
                   }}
                 />

@@ -1,15 +1,21 @@
-import { CreateBase, Form, useGetIdentity } from "ra-core";
+import { CreateBase, Form, useGetIdentity, useRedirect } from "ra-core";
 import { Card, CardContent } from "@/components/ui/card";
-
 import type { Contact } from "../types";
 import { ContactInputs } from "./ContactInputs";
 import { FormToolbar } from "../layout/FormToolbar";
 
 export const ContactCreate = () => {
   const { identity } = useGetIdentity();
+  const redirect = useRedirect();
+
   return (
     <CreateBase
-      redirect="show"
+      redirect="/contacts-quickview"
+      mutationOptions={{
+        onSuccess: () => {
+          redirect("/contacts-quickview");
+        },
+      }}
       transform={(data: Contact) => ({
         ...data,
         first_seen: new Date().toISOString(),

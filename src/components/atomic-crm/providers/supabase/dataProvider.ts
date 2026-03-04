@@ -20,6 +20,232 @@ import { getActivityLog } from "../commons/activity";
 import { getIsInitialized } from "./authProvider";
 import { supabase } from "./supabase";
 
+// ── Custom Field helpers ──────────────────────────────────────────────
+// Temporary storage for _cf_ values stripped in beforeSave,
+// keyed by `${resource}_${recordId}` or a unique token for creates.
+const pendingCustomFields = new Map<string, Record<string, unknown>>();
+let pendingCreateCfData: Record<string, unknown> | null = null;
+
+// ── Audit Log helper ──────────────────────────────────────────────────
+/**
+ * Write an audit log entry directly via the Supabase client.
+ * Non-blocking: failures are silently logged to console so they never
+ * disrupt the main data operation.
+ */
+async function createAuditLogEntry(params: {
+  action: "create" | "update" | "delete" | "restore" | "merge";
+  resourceType: string;
+  resourceId?: number;
+  resourceName?: string;
+  oldValues?: Record<string, unknown> | null;
+  newValues?: Record<string, unknown> | null;
+  changedFields?: string[] | null;
+  metadata?: Record<string, unknown> | null;
+  affectedCount?: number;
+}) {
+  try {
+    const { data: { user } } = await supabase.auth.getUser();
+    await supabase.from("audit_logs").insert({
+      user_id: user?.id ?? null,
+      user_email: user?.email ?? null,
+      user_name: user?.user_metadata?.first_name
+        ? `${user.user_metadata.first_name} ${user.user_metadata.last_name ?? ""}`.trim()
+        : user?.email ?? "System",
+      action: params.action,
+      resource_type: params.resourceType,
+      resource_id: params.resourceId ?? null,
+      resource_name: params.resourceName ?? null,
+      old_values: params.oldValues ?? null,
+      new_values: params.newValues ?? null,
+      changed_fields: params.changedFields ?? null,
+      metadata: params.metadata ?? null,
+      affected_count: params.affectedCount ?? 1,
+    });
+  } catch (e) {
+    console.warn("createAuditLogEntry: failed (non-critical)", e);
+  }
+}
+
+/** Compute which fields changed between two records. */
+function computeChangedFields(
+  oldValues: Record<string, unknown>,
+  newValues: Record<string, unknown>,
+): string[] {
+  const ignoreKeys = new Set(["updated_at", "last_seen", "created_at", "id"]);
+  const allKeys = new Set([...Object.keys(oldValues), ...Object.keys(newValues)]);
+  const changed: string[] = [];
+  for (const key of allKeys) {
+    if (ignoreKeys.has(key)) continue;
+    if (JSON.stringify(oldValues[key]) !== JSON.stringify(newValues[key])) {
+      changed.push(key);
+    }
+  }
+  return changed;
+}
+
+/** Get a human-readable name from a record. */
+function getRecordName(resource: string, record: Record<string, unknown>): string {
+  if (resource === "contacts") {
+    const first = record.first_name ?? "";
+    const last = record.last_name ?? "";
+    return `${first} ${last}`.trim() || `Kontakt #${record.id}`;
+  }
+  if (resource === "companies") return (record.name as string) || `Unternehmen #${record.id}`;
+  if (resource === "deals") return (record.name as string) || `Deal #${record.id}`;
+  return `${resource} #${record.id}`;
+}
+
+/**
+ * Strip `_cf_*` keys from a record, store them aside, and return the cleaned record.
+ */
+function stripCustomFields<T extends Record<string, unknown>>(data: T): T {
+  const cfEntries: Record<string, unknown> = {};
+  const cleaned = { ...data };
+  for (const key of Object.keys(cleaned)) {
+    if (key.startsWith("_cf_")) {
+      cfEntries[key] = cleaned[key];
+      delete cleaned[key];
+    }
+  }
+  if (Object.keys(cfEntries).length > 0) {
+    // Store for afterSave — for updates we key by id, for creates we use a singleton
+    if ((data as any).id) {
+      pendingCustomFields.set(`${(data as any).id}`, cfEntries);
+    } else {
+      pendingCreateCfData = cfEntries;
+    }
+  }
+  return cleaned;
+}
+
+/**
+ * After a record is saved, persist any pending _cf_ values to custom_field_values.
+ * Wrapped in try-catch so it fails gracefully if the tables don't exist yet.
+ */
+async function saveCustomFieldValues(
+  record: Record<string, unknown>,
+  dataProvider: DataProvider,
+  entityIdField: "contact_id" | "company_id" | "deal_id",
+) {
+  const id = record.id as number;
+  const cfData = pendingCustomFields.get(`${id}`) || pendingCreateCfData;
+  if (!cfData || Object.keys(cfData).length === 0) {
+    pendingCreateCfData = null;
+    return record;
+  }
+  pendingCustomFields.delete(`${id}`);
+  pendingCreateCfData = null;
+
+  try {
+  // Determine entity_type from entityIdField
+  const entityType = entityIdField.replace("_id", "") === "contact" ? "contacts"
+    : entityIdField.replace("_id", "") === "company" ? "companies" : "deals";
+
+  // Load field definitions for this entity type
+  const { data: fieldDefs } = await dataProvider.getList("custom_field_definitions", {
+    pagination: { page: 1, perPage: 200 },
+    sort: { field: "id", order: "ASC" },
+    filter: { entity_type: entityType, "deleted_at@is": "null" },
+  });
+
+  if (!fieldDefs || fieldDefs.length === 0) return record;
+
+  // Load existing custom field values for this record
+  const { data: existingValues } = await dataProvider.getList("custom_field_values", {
+    pagination: { page: 1, perPage: 200 },
+    sort: { field: "id", order: "ASC" },
+    filter: { [entityIdField]: id },
+  });
+
+  const existingByFieldId = new Map(
+    (existingValues || []).map((v: any) => [v.field_definition_id, v]),
+  );
+
+  for (const fieldDef of fieldDefs) {
+    const cfKey = `_cf_${fieldDef.name}`;
+    if (!(cfKey in cfData)) continue;
+
+    const value = cfData[cfKey];
+    const existing = existingByFieldId.get(fieldDef.id);
+
+    if (existing) {
+      // Update existing value
+      await dataProvider.update("custom_field_values", {
+        id: existing.id,
+        data: { value: value ?? null, updated_at: new Date().toISOString() },
+        previousData: existing,
+      });
+    } else {
+      // Create new value
+      await dataProvider.create("custom_field_values", {
+        data: {
+          field_definition_id: fieldDef.id,
+          [entityIdField]: id,
+          value: value ?? null,
+        },
+      });
+    }
+  }
+  } catch (e) {
+    // Tables may not exist yet on remote — fail silently
+    console.warn("saveCustomFieldValues: skipped (tables may not exist)", e);
+  }
+
+  return record;
+}
+
+/**
+ * After reading a record, merge in its custom field values as _cf_* keys.
+ * Wrapped in try-catch so it fails gracefully if the tables don't exist yet.
+ */
+async function mergeCustomFieldValues(
+  record: Record<string, unknown>,
+  dataProvider: DataProvider,
+  entityIdField: "contact_id" | "company_id" | "deal_id",
+) {
+  const id = record.id as number;
+  if (!id) return record;
+
+  try {
+  const entityType = entityIdField.replace("_id", "") === "contact" ? "contacts"
+    : entityIdField.replace("_id", "") === "company" ? "companies" : "deals";
+
+  // Load field definitions
+  const { data: fieldDefs } = await dataProvider.getList("custom_field_definitions", {
+    pagination: { page: 1, perPage: 200 },
+    sort: { field: "id", order: "ASC" },
+    filter: { entity_type: entityType, "deleted_at@is": "null" },
+  });
+
+  if (!fieldDefs || fieldDefs.length === 0) return record;
+
+  // Load this record's custom field values
+  const { data: values } = await dataProvider.getList("custom_field_values", {
+    pagination: { page: 1, perPage: 200 },
+    sort: { field: "id", order: "ASC" },
+    filter: { [entityIdField]: id },
+  });
+
+  if (!values || values.length === 0) return record;
+
+  const valueByFieldId = new Map(
+    values.map((v: any) => [v.field_definition_id, v.value]),
+  );
+
+  for (const fieldDef of fieldDefs) {
+    const val = valueByFieldId.get(fieldDef.id);
+    if (val !== undefined) {
+      (record as any)[`_cf_${fieldDef.name}`] = val;
+    }
+  }
+  } catch (e) {
+    // Tables may not exist yet on remote — fail silently
+    console.warn("mergeCustomFieldValues: skipped (tables may not exist)", e);
+  }
+
+  return record;
+}
+
 if (import.meta.env.VITE_SUPABASE_URL === undefined) {
   throw new Error("Please set the VITE_SUPABASE_URL environment variable");
 }
@@ -285,6 +511,48 @@ const lifeCycleCallbacks: ResourceCallbacks[] = [
   },
   {
     resource: "contacts",
+    beforeSave: async (data: any) => stripCustomFields(data),
+    afterSave: async (record: any, dataProvider: DataProvider) => {
+      return saveCustomFieldValues(record, dataProvider, "contact_id");
+    },
+    afterRead: async (record: any, dataProvider: DataProvider) => {
+      return mergeCustomFieldValues(record, dataProvider, "contact_id");
+    },
+    afterCreate: async (result: any) => {
+      createAuditLogEntry({
+        action: "create",
+        resourceType: "contacts",
+        resourceId: result.data?.id,
+        resourceName: getRecordName("contacts", result.data ?? {}),
+        newValues: result.data,
+      });
+      return result;
+    },
+    afterUpdate: async (result: any, params: any) => {
+      const changedFields = params.previousData
+        ? computeChangedFields(params.previousData, result.data ?? {})
+        : null;
+      createAuditLogEntry({
+        action: "update",
+        resourceType: "contacts",
+        resourceId: result.data?.id,
+        resourceName: getRecordName("contacts", result.data ?? {}),
+        oldValues: params.previousData ?? null,
+        newValues: result.data,
+        changedFields,
+      });
+      return result;
+    },
+    afterDelete: async (result: any) => {
+      createAuditLogEntry({
+        action: "delete",
+        resourceType: "contacts",
+        resourceId: result.data?.id,
+        resourceName: getRecordName("contacts", result.data ?? {}),
+        oldValues: result.data,
+      });
+      return result;
+    },
     beforeGetList: async (params) => {
       return applyFullTextSearch([
         "first_name",
@@ -299,6 +567,48 @@ const lifeCycleCallbacks: ResourceCallbacks[] = [
   },
   {
     resource: "companies",
+    beforeSave: async (data: any) => stripCustomFields(data),
+    afterSave: async (record: any, dataProvider: DataProvider) => {
+      return saveCustomFieldValues(record, dataProvider, "company_id");
+    },
+    afterRead: async (record: any, dataProvider: DataProvider) => {
+      return mergeCustomFieldValues(record, dataProvider, "company_id");
+    },
+    afterCreate: async (result: any) => {
+      createAuditLogEntry({
+        action: "create",
+        resourceType: "companies",
+        resourceId: result.data?.id,
+        resourceName: getRecordName("companies", result.data ?? {}),
+        newValues: result.data,
+      });
+      return result;
+    },
+    afterUpdate: async (result: any, params: any) => {
+      const changedFields = params.previousData
+        ? computeChangedFields(params.previousData, result.data ?? {})
+        : null;
+      createAuditLogEntry({
+        action: "update",
+        resourceType: "companies",
+        resourceId: result.data?.id,
+        resourceName: getRecordName("companies", result.data ?? {}),
+        oldValues: params.previousData ?? null,
+        newValues: result.data,
+        changedFields,
+      });
+      return result;
+    },
+    afterDelete: async (result: any) => {
+      createAuditLogEntry({
+        action: "delete",
+        resourceType: "companies",
+        resourceId: result.data?.id,
+        resourceName: getRecordName("companies", result.data ?? {}),
+        oldValues: result.data,
+      });
+      return result;
+    },
     beforeGetList: async (params) => {
       return applyFullTextSearch([
         "name",
@@ -332,6 +642,48 @@ const lifeCycleCallbacks: ResourceCallbacks[] = [
   },
   {
     resource: "deals",
+    beforeSave: async (data: any) => stripCustomFields(data),
+    afterSave: async (record: any, dataProvider: DataProvider) => {
+      return saveCustomFieldValues(record, dataProvider, "deal_id");
+    },
+    afterRead: async (record: any, dataProvider: DataProvider) => {
+      return mergeCustomFieldValues(record, dataProvider, "deal_id");
+    },
+    afterCreate: async (result: any) => {
+      createAuditLogEntry({
+        action: "create",
+        resourceType: "deals",
+        resourceId: result.data?.id,
+        resourceName: getRecordName("deals", result.data ?? {}),
+        newValues: result.data,
+      });
+      return result;
+    },
+    afterUpdate: async (result: any, params: any) => {
+      const changedFields = params.previousData
+        ? computeChangedFields(params.previousData, result.data ?? {})
+        : null;
+      createAuditLogEntry({
+        action: "update",
+        resourceType: "deals",
+        resourceId: result.data?.id,
+        resourceName: getRecordName("deals", result.data ?? {}),
+        oldValues: params.previousData ?? null,
+        newValues: result.data,
+        changedFields,
+      });
+      return result;
+    },
+    afterDelete: async (result: any) => {
+      createAuditLogEntry({
+        action: "delete",
+        resourceType: "deals",
+        resourceId: result.data?.id,
+        resourceName: getRecordName("deals", result.data ?? {}),
+        oldValues: result.data,
+      });
+      return result;
+    },
     beforeGetList: async (params) => {
       return applyFullTextSearch(["name", "category", "description"])(params);
     },

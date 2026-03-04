@@ -1,10 +1,11 @@
 import { ResponsiveBar } from "@nivo/bar";
 import { format, startOfMonth } from "date-fns";
+import { de } from "date-fns/locale";
 import { DollarSign } from "lucide-react";
-import { useGetList } from "ra-core";
+import { useGetList, useTranslate } from "ra-core";
 import { memo, useMemo } from "react";
 
-import type { Deal } from "../types";
+import type { Contact, Deal } from "../types";
 
 const multiplier = {
   opportunity: 0.2,
@@ -17,10 +18,18 @@ const threeMonthsAgo = new Date(
   new Date().setMonth(new Date().getMonth() - 6),
 ).toISOString();
 
-const DEFAULT_LOCALE = "en-US";
-const CURRENCY = "USD";
+const DEFAULT_LOCALE = "de-DE";
+const CURRENCY = "EUR";
+
+/**
+ * Contact statuses that count as "approved/released" (freigegeben).
+ * Deals are only included in the revenue chart if at least one
+ * associated contact has one of these statuses.
+ */
+const APPROVED_CONTACT_STATUSES = ["warm", "hot", "in-contract"];
 
 export const DealsChart = memo(() => {
+  const translate = useTranslate();
   const acceptedLanguages = navigator
     ? navigator.languages || [navigator.language]
     : [DEFAULT_LOCALE];
@@ -35,9 +44,30 @@ export const DealsChart = memo(() => {
       "created_at@gte": threeMonthsAgo,
     },
   });
+
+  // Load contacts to filter deals by contact approval status
+  const { data: contacts } = useGetList<Contact>("contacts", {
+    pagination: { perPage: 1000, page: 1 },
+    sort: { field: "id", order: "ASC" },
+  });
+
   const months = useMemo(() => {
-    if (!data) return [];
-    const dealsByMonth = data.reduce((acc, deal) => {
+    if (!data || !contacts) return [];
+
+    // Build a set of approved contact IDs for fast lookup
+    const approvedContactIds = new Set(
+      contacts
+        .filter((c) => APPROVED_CONTACT_STATUSES.includes(c.status))
+        .map((c) => c.id)
+    );
+
+    // Filter deals: only include deals where at least one contact is approved
+    const approvedDeals = data.filter((deal) => {
+      if (!deal.contact_ids || deal.contact_ids.length === 0) return false;
+      return deal.contact_ids.some((cId) => approvedContactIds.has(cId));
+    });
+
+    const dealsByMonth = approvedDeals.reduce((acc, deal) => {
       const month = startOfMonth(deal.created_at ?? new Date()).toISOString();
       if (!acc[month]) {
         acc[month] = [];
@@ -48,7 +78,7 @@ export const DealsChart = memo(() => {
 
     const amountByMonth = Object.keys(dealsByMonth).map((month) => {
       return {
-        date: format(month, "MMM"),
+        date: format(month, "MMM", { locale: de }),
         won: dealsByMonth[month]
           .filter((deal: Deal) => deal.stage === "won")
           .reduce((acc: number, deal: Deal) => {
@@ -72,9 +102,10 @@ export const DealsChart = memo(() => {
     });
 
     return amountByMonth;
-  }, [data]);
+  }, [data, contacts]);
 
-  if (isPending) return null; // FIXME return skeleton instead
+  if (isPending || !contacts) return null;
+
   const range = months.reduce(
     (acc, month) => {
       acc.min = Math.min(acc.min, month.lost);
@@ -83,6 +114,7 @@ export const DealsChart = memo(() => {
     },
     { min: 0, max: 0 },
   );
+
   return (
     <div className="flex flex-col">
       <div className="flex items-center mb-4">
@@ -90,7 +122,7 @@ export const DealsChart = memo(() => {
           <DollarSign className="text-muted-foreground w-6 h-6" />
         </div>
         <h2 className="text-xl font-semibold text-muted-foreground">
-          Upcoming Deal Revenue
+          {translate("crm.upcoming_deal_revenue")}
         </h2>
       </div>
       <div className="h-[400px]">
@@ -177,7 +209,7 @@ export const DealsChart = memo(() => {
                 value: 0,
                 lineStyle: { strokeOpacity: 0 },
                 textStyle: { fill: "#2ebca6" },
-                legend: "Won",
+                legend: translate("crm.won"),
                 legendPosition: "top-left",
                 legendOrientation: "vertical",
               },
@@ -189,7 +221,7 @@ export const DealsChart = memo(() => {
                   strokeWidth: 1,
                 },
                 textStyle: { fill: "#e25c3b" },
-                legend: "Lost",
+                legend: translate("crm.lost"),
                 legendPosition: "bottom-left",
                 legendOrientation: "vertical",
               },

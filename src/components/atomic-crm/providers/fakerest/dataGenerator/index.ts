@@ -25,6 +25,27 @@ export default (): Db => {
       config: {} as Db["configuration"][number]["config"],
     },
   ];
+  // RBAC
+  db.roles = [];
+  db.role_permissions = [];
+  db.teams = [];
+  db.team_members = [];
+  db.user_roles = [];
+  db.team_roles = [];
+  // ABAC
+  db.attribute_definitions = [];
+  db.user_attributes = [];
+  db.permission_conditions = [];
+  // Custom Objects
+  db.custom_object_definitions = [];
+  db.custom_field_definitions = [];
+  db.custom_field_values = [];
+  db.custom_object_data = [];
+  db.object_relationships = [];
+  db.relationship_definitions = [];
+  // Audit
+  db.audit_logs = [];
+  db.record_versions = [];
   finalize(db);
 
   return db;

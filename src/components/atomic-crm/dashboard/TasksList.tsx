@@ -1,10 +1,11 @@
 import { CheckSquare } from "lucide-react";
+import { useTranslate } from "ra-core";
 import { Card } from "@/components/ui/card";
-
 import { AddTask } from "../tasks/AddTask";
 import { TasksListContent } from "../tasks/TasksListContent";
 
 export const TasksList = () => {
+  const translate = useTranslate();
   return (
     <div className="flex flex-col gap-2">
       <div className="flex items-center">
@@ -12,7 +13,7 @@ export const TasksList = () => {
           <CheckSquare className="text-muted-foreground w-6 h-6" />
         </div>
         <h2 className="text-xl font-semibold text-muted-foreground flex-1">
-          Upcoming Tasks
+          {translate("crm.upcoming_tasks")}
         </h2>
         <AddTask display="icon" selectContact />
       </div>
