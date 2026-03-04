@@ -162,6 +162,7 @@ export function AttributeDefinitionsManager({
             previousData: editingAttribute,
           },
           {
+            returnPromise: true,
             onSuccess: () => {
               notify(translate("crm.rbac.attribute_updated"), { type: "success" });
               setIsDialogOpen(false);
@@ -175,6 +176,7 @@ export function AttributeDefinitionsManager({
           "attribute_definitions",
           { data },
           {
+            returnPromise: true,
             onSuccess: () => {
               notify(translate("crm.rbac.attribute_created"), { type: "success" });
               setIsDialogOpen(false);
@@ -197,6 +199,7 @@ export function AttributeDefinitionsManager({
         "attribute_definitions",
         { id: attributeToDelete.id, previousData: attributeToDelete },
         {
+          returnPromise: true,
           onSuccess: () => {
               notify(translate("crm.rbac.attribute_deleted"), { type: "success" });
             setIsDeleteDialogOpen(false);

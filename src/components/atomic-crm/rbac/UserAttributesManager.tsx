@@ -158,6 +158,7 @@ export function UserAttributesManager({
             previousData: editingAttribute,
           },
           {
+            returnPromise: true,
             onSuccess: () => {
               notify(translate("crm.rbac.attribute_updated"), { type: "success" });
               setIsDialogOpen(false);
@@ -171,6 +172,7 @@ export function UserAttributesManager({
           "user_attributes",
           { data: formData },
           {
+            returnPromise: true,
             onSuccess: () => {
               notify(translate("crm.rbac.attribute_assigned"), { type: "success" });
               setIsDialogOpen(false);
@@ -193,6 +195,7 @@ export function UserAttributesManager({
         "user_attributes",
         { id: attributeToDelete.id, previousData: attributeToDelete },
         {
+          returnPromise: true,
           onSuccess: () => {
               notify(translate("crm.rbac.attribute_removed"), { type: "success" });
             setIsDeleteDialogOpen(false);

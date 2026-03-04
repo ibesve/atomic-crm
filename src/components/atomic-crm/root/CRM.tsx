@@ -29,6 +29,9 @@ const NoteShowPage = lazy(() => import("../notes/NoteShowPage").then(m => ({ def
 const MobileTasksList = lazy(() => import("../tasks/MobileTasksList").then(m => ({ default: m.MobileTasksList })));
 const ContactListMobile = lazy(() => import("../contacts/ContactList").then(m => ({ default: m.ContactListMobile })));
 const AdminSettingsPage = lazy(() => import("../admin/AdminSettingsPage").then(m => ({ default: m.AdminSettingsPage })));
+const AuditLogPage = lazy(() => import("../audit/AuditLogPage").then(m => ({ default: m.AuditLogPage })));
+const RelationshipsPage = lazy(() => import("../custom-objects/RelationshipsPage").then(m => ({ default: m.RelationshipsPage })));
+const CustomObjectListPage = lazy(() => import("../custom-objects/CustomObjectListPage").then(m => ({ default: m.CustomObjectListPage })));
 
 import companies from "../companies";
 import contacts from "../contacts";
@@ -43,7 +46,7 @@ import {
 } from "../providers/supabase";
 import sales from "../sales";
 import type { ConfigurationContextValue } from "./ConfigurationContext";
-import { ConfigurationProvider, CONFIGURATION_STORE_KEY } from "./ConfigurationContext";
+import { CONFIGURATION_STORE_KEY } from "./ConfigurationContext";
 import type { CrmDataProvider } from "../providers/types";
 import { ProfilePage } from "../settings/ProfilePage";
 import {
@@ -220,6 +223,9 @@ const DesktopAdmin = (props: CoreAdminProps) => {
         <Route path="/admin/settings" element={<SuspenseWrapper><AdminSettingsPage /></SuspenseWrapper>} />
         <Route path="/contacts-quickview" element={<SuspenseWrapper><ContactDataGrid /></SuspenseWrapper>} />
         <Route path="/companies-quickview" element={<SuspenseWrapper><CompanyDataGrid /></SuspenseWrapper>} />
+        <Route path="/audit" element={<SuspenseWrapper><AuditLogPage /></SuspenseWrapper>} />
+        <Route path="/relationships" element={<SuspenseWrapper><RelationshipsPage /></SuspenseWrapper>} />
+        <Route path="/custom-objects/:objectName" element={<SuspenseWrapper><CustomObjectListPage /></SuspenseWrapper>} />
         <Route path={ProfilePage.path} element={<ProfilePage />} />
       </CustomRoutes>
       <Resource name="deals" {...deals} />
@@ -234,6 +240,8 @@ const DesktopAdmin = (props: CoreAdminProps) => {
       <Resource name="role_permissions" />
       <Resource name="teams" />
       <Resource name="team_members" />
+      <Resource name="user_roles" />
+      <Resource name="team_roles" />
       <Resource name="audit_logs" />
       <Resource name="record_versions" />
       <Resource name="custom_object_definitions" />
@@ -242,6 +250,9 @@ const DesktopAdmin = (props: CoreAdminProps) => {
       <Resource name="custom_object_data" />
       <Resource name="object_relationships" />
       <Resource name="relationship_definitions" />
+      <Resource name="attribute_definitions" />
+      <Resource name="user_attributes" />
+      <Resource name="permission_conditions" />
     </Admin>
   );
 };

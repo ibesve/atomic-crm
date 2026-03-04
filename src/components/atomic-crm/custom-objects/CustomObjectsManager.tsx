@@ -151,7 +151,7 @@ export function CustomObjectsManager() {
     }
 
     try {
-      await create("custom_object_definitions", { data: formData });
+      await create("custom_object_definitions", { data: formData }, { returnPromise: true });
       notify(translate("crm.custom_objects.created"), { type: "success" });
       setIsCreateDialogOpen(false);
       resetForm();
@@ -172,7 +172,7 @@ export function CustomObjectsManager() {
         id: editingObject.id,
         data: formData,
         previousData: editingObject,
-      });
+      }, { returnPromise: true });
       notify(translate("crm.custom_objects.updated"), { type: "success" });
       setEditingObject(null);
       resetForm();
@@ -189,7 +189,7 @@ export function CustomObjectsManager() {
       await deleteOne("custom_object_definitions", {
         id: deleteConfirmObject.id,
         previousData: deleteConfirmObject,
-      });
+      }, { returnPromise: true });
       notify(translate("crm.custom_objects.deleted"), { type: "success" });
       if (selectedObjectId === deleteConfirmObject.id) {
         setSelectedObjectId(null);

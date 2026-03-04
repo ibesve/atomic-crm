@@ -273,14 +273,14 @@ export function EditableCell<RecordType extends RaRecord = RaRecord>({
       className={cn("py-1 group cursor-pointer hover:bg-muted/50", className)}
       onClick={startEditing}
     >
-      <div className="flex items-center justify-between">
-        <span className="flex-1">
+      <div className="flex items-center justify-between min-w-0">
+        <span className="flex-1 truncate">
           {children ??
             (renderDisplay
               ? renderDisplay(currentValue, record)
               : currentValue ?? "-")}
         </span>
-        <Pencil className="h-3 w-3 opacity-0 group-hover:opacity-50 transition-opacity" />
+        <Pencil className="h-3 w-3 flex-shrink-0 opacity-0 group-hover:opacity-50 transition-opacity" />
       </div>
     </TableCell>
   );

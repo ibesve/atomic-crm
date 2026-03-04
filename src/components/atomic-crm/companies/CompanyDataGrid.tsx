@@ -1,20 +1,17 @@
 import { useTranslate, useGetList } from "ra-core";
 import { Link, useNavigate } from "react-router";
 import { ExternalLink } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import { EditableDataGrid } from "@/components/admin/editable-datagrid";
 import type { EditableColumnDef } from "@/components/admin/editable-datagrid";
 import type { Company, Sale } from "../types";
 import { useConfigurationContext } from "../root/ConfigurationContext";
 import { sizes } from "./sizes";
-import { CompanyEditSheet } from "./CompanyEditSheet";
 
 export const CompanyDataGrid = () => {
   const translate = useTranslate();
   const navigate = useNavigate();
   const { companySectors } = useConfigurationContext();
-  const [editSheetOpen, setEditSheetOpen] = useState(false);
-  const [editSheetCompanyId, setEditSheetCompanyId] = useState<number | null>(null);
 
   // Load reference data for dropdowns
   const { data: sales } = useGetList<Sale>("sales", {
@@ -177,18 +174,9 @@ export const CompanyDataGrid = () => {
         enableSoftDelete={false}
         storeKey="datagrid_companies_v2"
         onRowClick={(record) => {
-          setEditSheetCompanyId(record.id as number);
-          setEditSheetOpen(true);
+          navigate(`/companies/${record.id}/show`);
         }}
       />
-
-      {editSheetCompanyId && (
-        <CompanyEditSheet
-          open={editSheetOpen}
-          onOpenChange={setEditSheetOpen}
-          companyId={editSheetCompanyId}
-        />
-      )}
     </div>
   );
 };

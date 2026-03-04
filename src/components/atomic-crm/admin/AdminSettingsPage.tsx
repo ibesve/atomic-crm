@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useTranslate, useGetList, useGetIdentity, useCreate, useUpdate, useDelete, useNotify, useRefresh } from "ra-core";
 import { 
   Shield, 
@@ -11,7 +11,9 @@ import {
   Pencil,
   Save,
   Box,
-  Type
+  Type,
+  Tags,
+  Filter
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -37,17 +39,37 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { RolePermissionsEditor } from "../rbac/RolePermissionsEditor";
+import { UserRoleAssignment } from "../rbac/UserRoleAssignment";
 import { TeamManager } from "../rbac/TeamManager";
+import { TeamRoleAssignment } from "../rbac/TeamRoleAssignment";
+import { UnifiedAbacManager } from "../rbac/UnifiedAbacManager";
 import { AuditLogViewer } from "../audit/AuditLogViewer";
 import { CustomObjectsManager } from "../custom-objects/CustomObjectsManager";
 import { CustomFieldsManager } from "../custom-objects/CustomFieldsManager";
 import type { Role } from "../types/rbac";
+import type { CustomObjectDefinition } from "../types/custom-objects";
+import { useSearchParams } from "react-router";
 
 export const AdminSettingsPage = () => {
   const translate = useTranslate();
   const { identity } = useGetIdentity();
   const notify = useNotify();
   const refresh = useRefresh();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [activeTab, setActiveTab] = useState(searchParams.get("tab") || "roles");
+
+  const handleTabChange = (tab: string) => {
+    setActiveTab(tab);
+    setSearchParams({ tab }, { replace: true });
+  };
+
+  // Sync tab state when URL search params change externally (e.g., sidebar link)
+  useEffect(() => {
+    const tabParam = searchParams.get("tab");
+    if (tabParam && tabParam !== activeTab) {
+      setActiveTab(tabParam);
+    }
+  }, [searchParams]); // eslint-disable-line react-hooks/exhaustive-deps
   
   const [selectedRoleId, setSelectedRoleId] = useState<number | null>(null);
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
@@ -67,7 +89,17 @@ export const AdminSettingsPage = () => {
   const [deleteOne] = useDelete();
 
   // Custom Fields Tab State
-  const [selectedEntityType, setSelectedEntityType] = useState<"contacts" | "companies" | "deals">("contacts");
+  const [selectedEntityType, setSelectedEntityType] = useState<string>("contacts");
+
+  // Load custom object definitions for dynamic Custom Fields sub-tabs
+  const { data: customObjectDefs } = useGetList<CustomObjectDefinition>(
+    "custom_object_definitions",
+    {
+      pagination: { page: 1, perPage: 100 },
+      sort: { field: "sort_order", order: "ASC" },
+      filter: { "deleted_at@is": "null" },
+    }
+  );
 
   // Zugriffskontrolle
   if (!identity?.administrator) {
@@ -97,7 +129,7 @@ export const AdminSettingsPage = () => {
           name: roleForm.name.trim(), 
           description: roleForm.description.trim() || null 
         } 
-      });
+      }, { returnPromise: true });
       notify(translate("crm.admin.role_created"), { type: "success" });
       setIsCreateDialogOpen(false);
       setRoleForm({ name: "", description: "" });
@@ -122,7 +154,7 @@ export const AdminSettingsPage = () => {
           description: roleForm.description.trim() || null 
         },
         previousData: editingRole
-      });
+      }, { returnPromise: true });
       notify(translate("crm.admin.role_updated"), { type: "success" });
       setEditingRole(null);
       setRoleForm({ name: "", description: "" });
@@ -137,7 +169,7 @@ export const AdminSettingsPage = () => {
     if (!deleteConfirmRole) return;
     
     try {
-      await deleteOne("roles", { id: deleteConfirmRole.id, previousData: deleteConfirmRole });
+      await deleteOne("roles", { id: deleteConfirmRole.id, previousData: deleteConfirmRole }, { returnPromise: true });
       notify(translate("crm.admin.role_deleted"), { type: "success" });
       if (selectedRoleId === deleteConfirmRole.id) {
         setSelectedRoleId(null);
@@ -180,7 +212,7 @@ export const AdminSettingsPage = () => {
       </div>
 
       {/* Tabs */}
-      <Tabs defaultValue="roles" className="space-y-4">
+      <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-4">
         <TabsList className="flex-wrap">
           <TabsTrigger value="roles" className="gap-2">
             <Shield className="w-4 h-4" />
@@ -189,6 +221,10 @@ export const AdminSettingsPage = () => {
           <TabsTrigger value="teams" className="gap-2">
             <Users className="w-4 h-4" />
             {translate("crm.rbac.teams", { _: "Teams" })}
+          </TabsTrigger>
+          <TabsTrigger value="abac" className="gap-2">
+            <Tags className="w-4 h-4" />
+            {translate("crm.rbac.abac", { _: "ABAC / Attribute" })}
           </TabsTrigger>
           <TabsTrigger value="custom-objects" className="gap-2">
             <Box className="w-4 h-4" />
@@ -298,7 +334,10 @@ export const AdminSettingsPage = () => {
             {/* Berechtigungseditor */}
             <div className="lg:col-span-2">
               {selectedRoleId ? (
-                <RolePermissionsEditor roleId={selectedRoleId} />
+                <div className="space-y-4">
+                  <RolePermissionsEditor roleId={selectedRoleId} />
+                  <UserRoleAssignment roleId={selectedRoleId} />
+                </div>
               ) : (
                 <Card className="h-full flex items-center justify-center min-h-[400px]">
                   <div className="text-center p-8">
@@ -315,7 +354,15 @@ export const AdminSettingsPage = () => {
 
         {/* Teams Tab */}
         <TabsContent value="teams">
-          <TeamManager />
+          <div className="space-y-4">
+            <TeamManager />
+            <TeamRoleAssignment />
+          </div>
+        </TabsContent>
+
+        {/* ABAC Tab */}
+        <TabsContent value="abac">
+          <UnifiedAbacManager />
         </TabsContent>
 
         {/* Custom Objects Tab */}
@@ -323,25 +370,30 @@ export const AdminSettingsPage = () => {
           <CustomObjectsManager />
         </TabsContent>
 
-        {/* Custom Fields Tab - für Standard-Entities */}
+        {/* Custom Fields Tab - für Standard-Entities und Custom Objects */}
         <TabsContent value="custom-fields">
           <div className="space-y-4">
             <Card>
               <CardHeader className="pb-3">
                 <CardTitle className="text-base flex items-center gap-2">
                   <Type className="w-4 h-4" />
-                  {translate("crm.custom_fields.for_entities", { _: "Custom Fields für Standard-Objekte" })}
+                  {translate("crm.custom_fields.for_entities", { _: "Custom Fields" })}
                 </CardTitle>
               </CardHeader>
               <CardContent>
                 <p className="text-sm text-muted-foreground mb-4">
                   {translate("crm.custom_fields.for_entities_desc")}
                 </p>
-                <Tabs value={selectedEntityType} onValueChange={(v) => setSelectedEntityType(v as typeof selectedEntityType)}>
-                  <TabsList className="mb-4">
+                <Tabs value={selectedEntityType} onValueChange={setSelectedEntityType}>
+                  <TabsList className="mb-4 flex-wrap">
                     <TabsTrigger value="contacts">{translate("crm.custom_fields.contacts")}</TabsTrigger>
                     <TabsTrigger value="companies">{translate("crm.custom_fields.companies")}</TabsTrigger>
                     <TabsTrigger value="deals">{translate("crm.custom_fields.deals")}</TabsTrigger>
+                    {customObjectDefs?.map((obj) => (
+                      <TabsTrigger key={obj.id} value={`custom_${obj.id}`}>
+                        {obj.label}
+                      </TabsTrigger>
+                    ))}
                   </TabsList>
                   <TabsContent value="contacts">
                     <CustomFieldsManager entityType="contacts" />
@@ -352,6 +404,14 @@ export const AdminSettingsPage = () => {
                   <TabsContent value="deals">
                     <CustomFieldsManager entityType="deals" />
                   </TabsContent>
+                  {customObjectDefs?.map((obj) => (
+                    <TabsContent key={obj.id} value={`custom_${obj.id}`}>
+                      <CustomFieldsManager
+                        customObjectId={obj.id}
+                        customObjectName={obj.label}
+                      />
+                    </TabsContent>
+                  ))}
                 </Tabs>
               </CardContent>
             </Card>

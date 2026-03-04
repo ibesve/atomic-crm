@@ -26,6 +26,75 @@ import { supabase } from "./supabase";
 const pendingCustomFields = new Map<string, Record<string, unknown>>();
 let pendingCreateCfData: Record<string, unknown> | null = null;
 
+// ── Audit Log helper ──────────────────────────────────────────────────
+/**
+ * Write an audit log entry directly via the Supabase client.
+ * Non-blocking: failures are silently logged to console so they never
+ * disrupt the main data operation.
+ */
+async function createAuditLogEntry(params: {
+  action: "create" | "update" | "delete" | "restore" | "merge";
+  resourceType: string;
+  resourceId?: number;
+  resourceName?: string;
+  oldValues?: Record<string, unknown> | null;
+  newValues?: Record<string, unknown> | null;
+  changedFields?: string[] | null;
+  metadata?: Record<string, unknown> | null;
+  affectedCount?: number;
+}) {
+  try {
+    const { data: { user } } = await supabase.auth.getUser();
+    await supabase.from("audit_logs").insert({
+      user_id: user?.id ?? null,
+      user_email: user?.email ?? null,
+      user_name: user?.user_metadata?.first_name
+        ? `${user.user_metadata.first_name} ${user.user_metadata.last_name ?? ""}`.trim()
+        : user?.email ?? "System",
+      action: params.action,
+      resource_type: params.resourceType,
+      resource_id: params.resourceId ?? null,
+      resource_name: params.resourceName ?? null,
+      old_values: params.oldValues ?? null,
+      new_values: params.newValues ?? null,
+      changed_fields: params.changedFields ?? null,
+      metadata: params.metadata ?? null,
+      affected_count: params.affectedCount ?? 1,
+    });
+  } catch (e) {
+    console.warn("createAuditLogEntry: failed (non-critical)", e);
+  }
+}
+
+/** Compute which fields changed between two records. */
+function computeChangedFields(
+  oldValues: Record<string, unknown>,
+  newValues: Record<string, unknown>,
+): string[] {
+  const ignoreKeys = new Set(["updated_at", "last_seen", "created_at", "id"]);
+  const allKeys = new Set([...Object.keys(oldValues), ...Object.keys(newValues)]);
+  const changed: string[] = [];
+  for (const key of allKeys) {
+    if (ignoreKeys.has(key)) continue;
+    if (JSON.stringify(oldValues[key]) !== JSON.stringify(newValues[key])) {
+      changed.push(key);
+    }
+  }
+  return changed;
+}
+
+/** Get a human-readable name from a record. */
+function getRecordName(resource: string, record: Record<string, unknown>): string {
+  if (resource === "contacts") {
+    const first = record.first_name ?? "";
+    const last = record.last_name ?? "";
+    return `${first} ${last}`.trim() || `Kontakt #${record.id}`;
+  }
+  if (resource === "companies") return (record.name as string) || `Unternehmen #${record.id}`;
+  if (resource === "deals") return (record.name as string) || `Deal #${record.id}`;
+  return `${resource} #${record.id}`;
+}
+
 /**
  * Strip `_cf_*` keys from a record, store them aside, and return the cleaned record.
  */
@@ -449,6 +518,41 @@ const lifeCycleCallbacks: ResourceCallbacks[] = [
     afterRead: async (record: any, dataProvider: DataProvider) => {
       return mergeCustomFieldValues(record, dataProvider, "contact_id");
     },
+    afterCreate: async (result: any) => {
+      createAuditLogEntry({
+        action: "create",
+        resourceType: "contacts",
+        resourceId: result.data?.id,
+        resourceName: getRecordName("contacts", result.data ?? {}),
+        newValues: result.data,
+      });
+      return result;
+    },
+    afterUpdate: async (result: any, params: any) => {
+      const changedFields = params.previousData
+        ? computeChangedFields(params.previousData, result.data ?? {})
+        : null;
+      createAuditLogEntry({
+        action: "update",
+        resourceType: "contacts",
+        resourceId: result.data?.id,
+        resourceName: getRecordName("contacts", result.data ?? {}),
+        oldValues: params.previousData ?? null,
+        newValues: result.data,
+        changedFields,
+      });
+      return result;
+    },
+    afterDelete: async (result: any) => {
+      createAuditLogEntry({
+        action: "delete",
+        resourceType: "contacts",
+        resourceId: result.data?.id,
+        resourceName: getRecordName("contacts", result.data ?? {}),
+        oldValues: result.data,
+      });
+      return result;
+    },
     beforeGetList: async (params) => {
       return applyFullTextSearch([
         "first_name",
@@ -469,6 +573,41 @@ const lifeCycleCallbacks: ResourceCallbacks[] = [
     },
     afterRead: async (record: any, dataProvider: DataProvider) => {
       return mergeCustomFieldValues(record, dataProvider, "company_id");
+    },
+    afterCreate: async (result: any) => {
+      createAuditLogEntry({
+        action: "create",
+        resourceType: "companies",
+        resourceId: result.data?.id,
+        resourceName: getRecordName("companies", result.data ?? {}),
+        newValues: result.data,
+      });
+      return result;
+    },
+    afterUpdate: async (result: any, params: any) => {
+      const changedFields = params.previousData
+        ? computeChangedFields(params.previousData, result.data ?? {})
+        : null;
+      createAuditLogEntry({
+        action: "update",
+        resourceType: "companies",
+        resourceId: result.data?.id,
+        resourceName: getRecordName("companies", result.data ?? {}),
+        oldValues: params.previousData ?? null,
+        newValues: result.data,
+        changedFields,
+      });
+      return result;
+    },
+    afterDelete: async (result: any) => {
+      createAuditLogEntry({
+        action: "delete",
+        resourceType: "companies",
+        resourceId: result.data?.id,
+        resourceName: getRecordName("companies", result.data ?? {}),
+        oldValues: result.data,
+      });
+      return result;
     },
     beforeGetList: async (params) => {
       return applyFullTextSearch([
@@ -509,6 +648,41 @@ const lifeCycleCallbacks: ResourceCallbacks[] = [
     },
     afterRead: async (record: any, dataProvider: DataProvider) => {
       return mergeCustomFieldValues(record, dataProvider, "deal_id");
+    },
+    afterCreate: async (result: any) => {
+      createAuditLogEntry({
+        action: "create",
+        resourceType: "deals",
+        resourceId: result.data?.id,
+        resourceName: getRecordName("deals", result.data ?? {}),
+        newValues: result.data,
+      });
+      return result;
+    },
+    afterUpdate: async (result: any, params: any) => {
+      const changedFields = params.previousData
+        ? computeChangedFields(params.previousData, result.data ?? {})
+        : null;
+      createAuditLogEntry({
+        action: "update",
+        resourceType: "deals",
+        resourceId: result.data?.id,
+        resourceName: getRecordName("deals", result.data ?? {}),
+        oldValues: params.previousData ?? null,
+        newValues: result.data,
+        changedFields,
+      });
+      return result;
+    },
+    afterDelete: async (result: any) => {
+      createAuditLogEntry({
+        action: "delete",
+        resourceType: "deals",
+        resourceId: result.data?.id,
+        resourceName: getRecordName("deals", result.data ?? {}),
+        oldValues: result.data,
+      });
+      return result;
     },
     beforeGetList: async (params) => {
       return applyFullTextSearch(["name", "category", "description"])(params);

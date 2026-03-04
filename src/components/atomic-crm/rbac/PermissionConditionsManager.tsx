@@ -202,6 +202,7 @@ export function PermissionConditionsManager({
             previousData: editingCondition,
           },
           {
+            returnPromise: true,
             onSuccess: () => {
               notify(translate("crm.rbac.condition_updated"), { type: "success" });
               setIsDialogOpen(false);
@@ -215,6 +216,7 @@ export function PermissionConditionsManager({
           "permission_conditions",
           { data },
           {
+            returnPromise: true,
             onSuccess: () => {
               notify(translate("crm.rbac.condition_created"), { type: "success" });
               setIsDialogOpen(false);
@@ -237,6 +239,7 @@ export function PermissionConditionsManager({
         "permission_conditions",
         { id: conditionToDelete.id, previousData: conditionToDelete },
         {
+          returnPromise: true,
           onSuccess: () => {
             notify(translate("crm.rbac.condition_deleted"), { type: "success" });
             setIsDeleteDialogOpen(false);
@@ -260,6 +263,7 @@ export function PermissionConditionsManager({
           previousData: condition,
         },
         {
+          returnPromise: true,
           onSuccess: () => {
             notify(
               condition.is_active ? translate("crm.rbac.condition_deactivated") : translate("crm.rbac.condition_activated"),

@@ -1,12 +1,11 @@
 import { useTranslate, useGetList } from "ra-core";
 import { Link, useNavigate } from "react-router";
 import { ExternalLink } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import { EditableDataGrid } from "@/components/admin/editable-datagrid";
 import type { EditableColumnDef } from "@/components/admin/editable-datagrid";
 import type { Contact, Company, Sale } from "../types";
 import { useCustomFieldColumns } from "../custom-objects/useCustomFieldColumns";
-import { ContactEditSheet } from "./ContactEditSheet";
 
 // Hilfsfunktion um die erste E-Mail aus email_jsonb zu extrahieren
 const getFirstEmail = (emailJsonb: any): string => {
@@ -27,8 +26,6 @@ const getFirstPhone = (phoneJsonb: any): string => {
 export const ContactDataGrid = () => {
   const translate = useTranslate();
   const navigate = useNavigate();
-  const [editSheetOpen, setEditSheetOpen] = useState(false);
-  const [editSheetContactId, setEditSheetContactId] = useState<number | null>(null);
 
   // Lade Referenzdaten für Dropdown-Auswahl
   const { data: companies } = useGetList<Company>("companies", {
@@ -221,18 +218,9 @@ export const ContactDataGrid = () => {
         enableSoftDelete={false}
         storeKey="datagrid_contacts_v2"
         onRowClick={(record) => {
-          setEditSheetContactId(record.id as number);
-          setEditSheetOpen(true);
+          navigate(`/contacts/${record.id}/show`);
         }}
       />
-
-      {editSheetContactId && (
-        <ContactEditSheet
-          open={editSheetOpen}
-          onOpenChange={setEditSheetOpen}
-          contactId={editSheetContactId}
-        />
-      )}
     </div>
   );
 };

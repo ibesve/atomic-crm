@@ -1,4 +1,4 @@
-import { RecordRepresentation, type Identifier } from "ra-core";
+import { RecordRepresentation, useTranslate, type Identifier } from "ra-core";
 import { EditSheet } from "../misc/EditSheet";
 import { CompanyInputs } from "./CompanyInputs";
 import { RelationshipManager } from "../custom-objects/RelationshipManager";
@@ -15,24 +15,27 @@ export const CompanyEditSheet = ({
   onOpenChange,
   companyId,
 }: CompanyEditSheetProps) => {
+  const translate = useTranslate();
+
   return (
     <EditSheet
       resource="companies"
       id={companyId}
       title={
-        <h1 className="text-xl font-semibold">
+        <span className="text-xl font-semibold">
           Edit <RecordRepresentation />
-        </h1>
+        </span>
       }
       open={open}
       onOpenChange={onOpenChange}
     >
       <CompanyInputs />
+
       <Separator />
       <RelationshipManager
         sourceType="companies"
         sourceId={companyId as number}
-        title="Verknüpfungen"
+        title={translate("crm.relationships", { _: "Verknüpfungen" })}
       />
     </EditSheet>
   );

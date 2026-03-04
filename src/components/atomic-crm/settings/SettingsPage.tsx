@@ -46,7 +46,6 @@ import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 import ImageEditorField from "../misc/ImageEditorField";
-import { RelationshipDefinitionManager } from "../custom-objects/RelationshipDefinitionManager";
 import {
   useConfigurationContext,
   useConfigurationUpdater,
@@ -625,7 +624,6 @@ const SECTIONS = [
   { id: "deals", label: "Deals" },
   { id: "notes", label: "Notes" },
   { id: "tasks", label: "Tasks" },
-  { id: "relationships", label: "Relationships" },
 ];
 
 const ConfigurationForm = () => {
@@ -873,16 +871,6 @@ const ConfigurationFormFields = () => {
                 <TextInput source="label" label={false} />
               </SimpleFormIterator>
             </ArrayInput>
-          </CardContent>
-        </Card>
-
-        {/* Relationships */}
-        <Card id="relationships">
-          <CardContent className="space-y-4">
-            <h2 className="text-xl font-semibold text-muted-foreground">
-              Relationships
-            </h2>
-            <RelationshipDefinitionManager />
           </CardContent>
         </Card>
       </div>

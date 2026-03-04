@@ -13,6 +13,7 @@ import { ReferenceInputWithCreate } from "@/components/admin/reference-input-wit
 import { isLinkedinUrl } from "../misc/isLinkedInUrl";
 import { useConfigurationContext } from "../root/ConfigurationContext";
 import { Avatar } from "./Avatar";
+import { contactGender } from "./contactGender";
 import { CustomFieldsSection } from "../custom-objects/CustomFieldsSection";
 import { useState, useEffect, useCallback } from "react";
 
@@ -110,7 +111,7 @@ const ContactPositionInputs = () => {
             source: "sector",
             label: "Branche",
             type: "select",
-            options: companySectors.map((s) => ({ value: s, label: s })),
+            options: companySectors.map((s) => ({ value: typeof s === "string" ? s : s.value, label: typeof s === "string" ? s : s.label })),
           },
           {
             source: "website",

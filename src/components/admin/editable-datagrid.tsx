@@ -199,11 +199,11 @@ export function EditableDataGrid<RecordType extends RaRecord = RaRecord>({
     filter: buildFilter(),
   });
 
-  // Count deleted items
+  // Count deleted items (only when soft delete is enabled)
   const { total: deletedCount } = useGetList<RecordType>(resource, {
     pagination: { page: 1, perPage: 1 },
     filter: { "deleted_at@not.is": "null" },
-  });
+  }, { enabled: enableSoftDelete });
 
   // Referenzdaten direkt aus den Column-Definitionen holen (keine Hooks mehr in der map!)
   const getReferenceData = useCallback((col: EditableColumnDef<RecordType>) => {
@@ -518,7 +518,7 @@ export function EditableDataGrid<RecordType extends RaRecord = RaRecord>({
 
       {/* Table */}
       <div className="rounded-md border overflow-x-auto" ref={tableRef}>
-        <Table className="table-fixed">
+        <Table className="w-full">
           <TableHeader>
             <TableRow>
               {bulkActions && (
@@ -637,21 +637,23 @@ export function EditableDataGrid<RecordType extends RaRecord = RaRecord>({
                           }
                         />
                       ) : (
-                        <TableCell key={col.source} className="py-1">
-                          {col.render ? (
-                            col.render(record)
-                          ) : col.renderLink && col.linkPath ? (
-                            <Link
-                              to={col.linkPath(record)}
-                              className="text-primary hover:underline flex items-center gap-1"
-                              onClick={(e) => e.stopPropagation()}
-                            >
-                              {getNestedValue(record, col.source)}
-                              <ExternalLink className="h-3 w-3" />
-                            </Link>
-                          ) : (
-                            getNestedValue(record, col.source) ?? "-"
-                          )}
+                        <TableCell key={col.source} className="py-1 max-w-[200px]">
+                          <div className="truncate">
+                            {col.render ? (
+                              col.render(record)
+                            ) : col.renderLink && col.linkPath ? (
+                              <Link
+                                to={col.linkPath(record)}
+                                className="text-primary hover:underline flex items-center gap-1"
+                                onClick={(e) => e.stopPropagation()}
+                              >
+                                {getNestedValue(record, col.source)}
+                                <ExternalLink className="h-3 w-3" />
+                              </Link>
+                            ) : (
+                              getNestedValue(record, col.source) ?? "-"
+                            )}
+                          </div>
                         </TableCell>
                       )
                     )}

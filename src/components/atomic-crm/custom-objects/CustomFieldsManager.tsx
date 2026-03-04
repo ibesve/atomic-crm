@@ -233,7 +233,7 @@ export function CustomFieldsManager({
     if (!data.description) data.description = null;
 
     try {
-      await create("custom_field_definitions", { data });
+      await create("custom_field_definitions", { data }, { returnPromise: true });
       notify(translate("crm.custom_fields.created"), { type: "success" });
       setIsCreateDialogOpen(false);
       resetForm();
@@ -266,7 +266,7 @@ export function CustomFieldsManager({
         id: editingField.id,
         data,
         previousData: editingField,
-      });
+      }, { returnPromise: true });
       notify(translate("crm.custom_fields.updated"), { type: "success" });
       setEditingField(null);
       resetForm();
@@ -285,7 +285,7 @@ export function CustomFieldsManager({
         id: deleteConfirmField.id,
         data: { deleted_at: new Date().toISOString() },
         previousData: deleteConfirmField,
-      });
+      }, { returnPromise: true });
       notify(translate("crm.custom_fields.deleted"), { type: "success" });
       setDeleteConfirmField(null);
       refresh();

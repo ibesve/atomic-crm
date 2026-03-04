@@ -36,9 +36,9 @@ export const CompanyListFilter = () => {
         {sectors.map((sector) => (
           <ToggleFilterButton
             className="w-full justify-between"
-            label={sector.label}
-            key={sector.value}
-            value={{ sector: sector.value }}
+            label={sector.name}
+            key={sector.id}
+            value={{ sector: sector.id }}
           />
         ))}
       </FilterCategory>
