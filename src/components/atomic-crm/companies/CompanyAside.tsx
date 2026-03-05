@@ -1,7 +1,8 @@
 import { Globe, Linkedin, Phone } from "lucide-react";
 import { useRecordContext } from "ra-core";
 import { EditButton } from "@/components/admin/edit-button";
-import { DeleteButton } from "@/components/admin/delete-button";
+import { SoftDeleteButton } from "@/components/admin/soft-delete-button";
+import { RevisionsButton } from "@/components/admin/revisions-button";
 import { ReferenceField } from "@/components/admin/reference-field";
 import { ShowButton } from "@/components/admin/show-button";
 import { TextField } from "@/components/admin/text-field";
@@ -43,7 +44,8 @@ export const CompanyAside = ({ link = "edit" }: CompanyAsideProps) => {
 
       {link !== "edit" && (
         <div className="mt-6 pt-6 border-t hidden sm:flex flex-col gap-2 items-start">
-          <DeleteButton
+          <RevisionsButton />
+          <SoftDeleteButton
             className="h-6 cursor-pointer hover:bg-destructive/10! text-destructive! border-destructive! focus-visible:ring-destructive/20 dark:focus-visible:ring-destructive/40"
             size="sm"
           />

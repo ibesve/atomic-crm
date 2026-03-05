@@ -529,13 +529,20 @@ export function CustomFieldsManager({
             {/* Optionen für Select/Multiselect */}
             {(formData.field_type === "select" ||
               formData.field_type === "multiselect") && (
-              <div className="space-y-2">
-                <Label>{translate("crm.custom_fields.select_options")}</Label>
+              <div className="space-y-3 p-3 rounded-lg border bg-muted/30">
+                <Label className="text-sm font-semibold">
+                  {translate("crm.custom_fields.select_options")} *
+                </Label>
+                <p className="text-xs text-muted-foreground">
+                  {formData.field_type === "multiselect"
+                    ? "Geben Sie die Optionen ein, aus denen Benutzer mehrere auswählen können."
+                    : "Geben Sie die Optionen ein, aus denen Benutzer eine auswählen können."}
+                </p>
                 <div className="flex gap-2">
                   <Input
                     value={newOption}
                     onChange={(e) => setNewOption(e.target.value)}
-                    placeholder={translate("crm.custom_fields.new_option")}
+                    placeholder={translate("crm.custom_fields.new_option", { _: "Neue Option eingeben…" })}
                     onKeyDown={(e) => {
                       if (e.key === "Enter") {
                         e.preventDefault();
@@ -545,51 +552,72 @@ export function CustomFieldsManager({
                   />
                   <Button
                     type="button"
-                    variant="outline"
+                    variant="secondary"
                     onClick={handleAddOption}
+                    disabled={!newOption.trim()}
                   >
-                    <Plus className="w-4 h-4" />
+                    <Plus className="w-4 h-4 mr-1" />
+                    Hinzufügen
                   </Button>
                 </div>
-                {formData.options && formData.options.length > 0 && (
-                  <div className="flex flex-wrap gap-2 mt-2">
+                {formData.options && formData.options.length > 0 ? (
+                  <div className="space-y-1">
                     {formData.options.map((opt, idx) => (
-                      <Badge
+                      <div
                         key={idx}
-                        variant="secondary"
-                        className="cursor-pointer hover:bg-destructive hover:text-destructive-foreground"
-                        onClick={() => handleRemoveOption(idx)}
+                        className="flex items-center justify-between px-2 py-1.5 rounded border bg-background text-sm"
                       >
-                        {opt.label}
-                        <X className="w-3 h-3 ml-1" />
-                      </Badge>
+                        <span>{opt.label}</span>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          className="h-6 w-6 text-muted-foreground hover:text-destructive"
+                          onClick={() => handleRemoveOption(idx)}
+                        >
+                          <X className="w-3.5 h-3.5" />
+                        </Button>
+                      </div>
                     ))}
                   </div>
+                ) : (
+                  <p className="text-xs text-amber-600 dark:text-amber-400">
+                    Noch keine Optionen hinzugefügt. Geben Sie mindestens eine Option ein.
+                  </p>
                 )}
               </div>
             )}
 
             {/* Referenz für Reference-Felder */}
             {formData.field_type === "reference" && (
-              <>
+              <div className="space-y-3 p-3 rounded-lg border bg-muted/30">
+                <Label className="text-sm font-semibold">
+                  Verknüpfung konfigurieren
+                </Label>
+                <p className="text-xs text-muted-foreground">
+                  Wählen Sie das Ziel-Objekt, mit dem verknüpft werden soll.
+                  Im Formular erscheint automatisch eine Dropdown-Liste aller sichtbaren Einträge.
+                </p>
                 <div className="space-y-2">
                   <Label>{translate("crm.custom_fields.reference_object")}</Label>
                   <Select
-                    value={formData.reference_object}
+                    value={formData.reference_object || undefined}
                     onValueChange={(v) =>
                       setFormData((prev) => ({ ...prev, reference_object: v }))
                     }
                   >
                     <SelectTrigger>
-                      <SelectValue placeholder={translate("crm.custom_fields.select_object")} />
+                      <SelectValue placeholder={translate("crm.custom_fields.select_object", { _: "Objekt auswählen…" })} />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="contacts">{translate("crm.custom_fields.ref_contacts")}</SelectItem>
-                      <SelectItem value="companies">{translate("crm.custom_fields.ref_companies")}</SelectItem>
-                      <SelectItem value="deals">{translate("crm.custom_fields.ref_deals")}</SelectItem>
+                      <SelectItem value="contacts">{translate("crm.custom_fields.ref_contacts", { _: "Kontakte" })}</SelectItem>
+                      <SelectItem value="companies">{translate("crm.custom_fields.ref_companies", { _: "Unternehmen" })}</SelectItem>
+                      <SelectItem value="deals">{translate("crm.custom_fields.ref_deals", { _: "Deals" })}</SelectItem>
+                      <SelectItem value="sales">Mitarbeiter</SelectItem>
                       {allCustomObjects && allCustomObjects.length > 0 && (
                         <>
                           <div className="border-t my-1" />
+                          <div className="px-2 py-1 text-xs text-muted-foreground font-medium">Custom Objects</div>
                           {allCustomObjects.map((obj) => (
                             <SelectItem key={obj.id} value={`custom_${obj.name}`}>
                               {obj.label}
@@ -601,7 +629,7 @@ export function CustomFieldsManager({
                   </Select>
                 </div>
                 <div className="space-y-2">
-                  <Label>{translate("crm.custom_fields.display_field")}</Label>
+                  <Label>{translate("crm.custom_fields.display_field", { _: "Anzeigefeld" })}</Label>
                   <Input
                     value={formData.reference_display_field}
                     onChange={(e) =>
@@ -610,10 +638,20 @@ export function CustomFieldsManager({
                         reference_display_field: e.target.value,
                       }))
                     }
-                    placeholder="z.B. name"
+                    placeholder="z.B. name, title, label"
                   />
+                  <p className="text-xs text-muted-foreground">
+                    Der Feldname, der im Dropdown als Anzeige verwendet wird (Standard: name).
+                  </p>
                 </div>
-              </>
+                {formData.reference_object && (
+                  <div className="text-xs text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
+                    <Link className="w-3.5 h-3.5" />
+                    Verknüpft mit: <strong>{formData.reference_object.startsWith("custom_") ? allCustomObjects?.find(o => `custom_${o.name}` === formData.reference_object)?.label || formData.reference_object : formData.reference_object}</strong>
+                    — Einträge werden automatisch als Dropdown im Formular und QuickView angezeigt.
+                  </div>
+                )}
+              </div>
             )}
 
             {/* Platzhalter & Hilfetext */}

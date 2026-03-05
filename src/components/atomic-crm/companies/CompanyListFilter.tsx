@@ -13,8 +13,8 @@ export const CompanyListFilter = () => {
   const translate = useTranslate();
   
   const sectors = companySectors.map((sector) => ({
-    id: sector,
-    name: sector,
+    id: sector.value,
+    name: sector.label,
   }));
 
   return (

@@ -3,7 +3,8 @@ import { TextInput } from "@/components/admin/text-input";
 import { SelectInput } from "@/components/admin/select-input";
 import { BooleanInput } from "@/components/admin/boolean-input";
 import { DateInput } from "@/components/admin/date-input";
-import type { CustomFieldDefinition } from "../types/custom-objects";
+import { ReferenceInput } from "@/components/admin/reference-input";
+import type { CustomFieldDefinition, CustomObjectDefinition } from "../types/custom-objects";
 
 interface CustomFieldsSectionProps {
   entityType: "contacts" | "companies" | "deals";
@@ -145,6 +146,10 @@ const CustomFieldInput = ({ field }: { field: CustomFieldDefinition }) => {
           }
         />
       );
+    case "reference":
+      return (
+        <ReferenceFieldFormInput field={field} source={source} />
+      );
     default:
       return (
         <TextInput
@@ -154,6 +159,79 @@ const CustomFieldInput = ({ field }: { field: CustomFieldDefinition }) => {
         />
       );
   }
+};
+
+/**
+ * Renders a reference field as a SelectInput with choices loaded from the target resource.
+ */
+const ReferenceFieldFormInput = ({
+  field,
+  source,
+}: {
+  field: CustomFieldDefinition;
+  source: string;
+}) => {
+  const target = field.reference_object;
+
+  // Determine resource to load
+  const resource =
+    target?.startsWith("custom_") ? "custom_object_data" : target || "contacts";
+
+  // For custom objects, resolve the definition ID
+  const { data: customDefs } = useGetList<CustomObjectDefinition>(
+    "custom_object_definitions",
+    {
+      pagination: { page: 1, perPage: 100 },
+      sort: { field: "name", order: "ASC" },
+      filter: target?.startsWith("custom_")
+        ? { name: target.replace("custom_", "") }
+        : { id: -1 },
+    },
+  );
+  const customDefId = customDefs?.[0]?.id;
+
+  const filter =
+    resource === "custom_object_data" && customDefId
+      ? { object_definition_id: customDefId }
+      : {};
+
+  const { data: records } = useGetList(resource, {
+    pagination: { page: 1, perPage: 500 },
+    sort: { field: "id", order: "ASC" },
+    filter: target ? filter : { id: -1 },
+  });
+
+  const displayField = field.reference_display_field || "name";
+
+  const choices = (records || []).map((r: Record<string, unknown>) => {
+    let label: string;
+    if (resource === "custom_object_data") {
+      const d = (r.data || {}) as Record<string, unknown>;
+      label = String(d[displayField] || d.name || d.title || `#${r.id}`);
+    } else if (target === "contacts" || target === "sales") {
+      label = [r.first_name, r.last_name].filter(Boolean).join(" ") || `#${r.id}`;
+    } else {
+      label = String(r.name || r.title || `#${r.id}`);
+    }
+    return { id: String(r.id), name: label };
+  });
+
+  if (!target) {
+    return (
+      <p className="text-xs text-amber-600">
+        Kein Zielobjekt konfiguriert.
+      </p>
+    );
+  }
+
+  return (
+    <SelectInput
+      source={source}
+      label={field.label}
+      helperText={field.help_text || false}
+      choices={choices}
+    />
+  );
 };
 
 export default CustomFieldsSection;

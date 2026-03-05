@@ -63,6 +63,45 @@ GROUP BY
     co.id, c.name;
 
 -- ============================================
+-- 2b. Update companies_summary view to include deleted_at
+-- ============================================
+
+DROP VIEW IF EXISTS companies_summary;
+
+CREATE VIEW companies_summary AS
+SELECT
+    c.id,
+    c.created_at,
+    c.name,
+    c.sector,
+    c.size,
+    c.linkedin_url,
+    c.website,
+    c.phone_number,
+    c.address,
+    c.zipcode,
+    c.city,
+    c.state_abbr,
+    c.sales_id,
+    c.context_links,
+    c.country,
+    c.description,
+    c.revenue,
+    c.tax_identifier,
+    c.logo,
+    c.deleted_at,
+    count(distinct d.id) AS nb_deals,
+    count(distinct co.id) AS nb_contacts
+FROM
+    companies c
+LEFT JOIN
+    deals d ON c.id = d.company_id
+LEFT JOIN
+    contacts co ON c.id = co.company_id
+GROUP BY
+    c.id;
+
+-- ============================================
 -- 3. RBAC: Roles & Teams
 -- ============================================
 

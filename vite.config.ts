@@ -27,7 +27,7 @@ export default defineConfig({
       registerType: "autoUpdate",
       workbox: {
         globPatterns: ["**/*.{js,css,html,ico,png,svg,woff,woff2}"],
-        maximumFileSizeToCacheInBytes: 5 * 1024 * 1024, // 5 MiB
+        maximumFileSizeToCacheInBytes: 8 * 1024 * 1024, // 8 MiB
       },
       manifest: false, // Use existing manifest.json from public/
     }),
@@ -60,6 +60,9 @@ export default defineConfig({
     preserveSymlinks: true,
     alias: {
       "@": path.resolve(__dirname, "./src"),
+      // react-router v7 merged react-router-dom into react-router.
+      // EE packages still import from react-router-dom, so alias it.
+      "react-router-dom": path.resolve(__dirname, "node_modules/react-router"),
     },
   },
   server: {

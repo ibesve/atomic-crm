@@ -42,7 +42,7 @@ export const CompanyDataGrid = () => {
         label: translate("resources.companies.fields.sector", { _: "Branche" }),
         editable: true,
         type: "select",
-        options: companySectors.map((s) => ({ value: s, label: s })),
+        options: companySectors.map((s) => ({ value: s.value, label: s.label })),
         sortable: true,
       },
       {

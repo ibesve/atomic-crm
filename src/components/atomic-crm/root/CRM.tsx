@@ -32,6 +32,7 @@ const AdminSettingsPage = lazy(() => import("../admin/AdminSettingsPage").then(m
 const AuditLogPage = lazy(() => import("../audit/AuditLogPage").then(m => ({ default: m.AuditLogPage })));
 const RelationshipsPage = lazy(() => import("../custom-objects/RelationshipsPage").then(m => ({ default: m.RelationshipsPage })));
 const CustomObjectListPage = lazy(() => import("../custom-objects/CustomObjectListPage").then(m => ({ default: m.CustomObjectListPage })));
+const DeletedRecordsPage = lazy(() => import("./DeletedRecordsPage").then(m => ({ default: m.DeletedRecordsPage })));
 
 import companies from "../companies";
 import contacts from "../contacts";
@@ -224,6 +225,7 @@ const DesktopAdmin = (props: CoreAdminProps) => {
         <Route path="/contacts-quickview" element={<SuspenseWrapper><ContactDataGrid /></SuspenseWrapper>} />
         <Route path="/companies-quickview" element={<SuspenseWrapper><CompanyDataGrid /></SuspenseWrapper>} />
         <Route path="/audit" element={<SuspenseWrapper><AuditLogPage /></SuspenseWrapper>} />
+        <Route path="/deleted" element={<SuspenseWrapper><DeletedRecordsPage /></SuspenseWrapper>} />
         <Route path="/relationships" element={<SuspenseWrapper><RelationshipsPage /></SuspenseWrapper>} />
         <Route path="/custom-objects/:objectName" element={<SuspenseWrapper><CustomObjectListPage /></SuspenseWrapper>} />
         <Route path={ProfilePage.path} element={<ProfilePage />} />
@@ -253,6 +255,9 @@ const DesktopAdmin = (props: CoreAdminProps) => {
       <Resource name="attribute_definitions" />
       <Resource name="user_attributes" />
       <Resource name="permission_conditions" />
+      <Resource name="events" />
+      <Resource name="locks" />
+      <Resource name="categories" />
     </Admin>
   );
 };

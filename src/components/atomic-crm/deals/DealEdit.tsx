@@ -6,7 +6,8 @@ import {
   useRedirect,
 } from "ra-core";
 import { Link } from "react-router";
-import { DeleteButton } from "@/components/admin/delete-button";
+import { SoftDeleteButton } from "@/components/admin/soft-delete-button";
+import { RevisionsButton } from "@/components/admin/revisions-button";
 import { ReferenceField } from "@/components/admin/reference-field";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
@@ -70,7 +71,8 @@ function EditHeader() {
           <h2 className="text-2xl font-semibold">Edit {deal.name} deal</h2>
         </div>
         <div className="flex gap-2 pr-12">
-          <DeleteButton />
+          <RevisionsButton />
+          <SoftDeleteButton />
           <Button asChild variant="outline" className="h-9">
             <Link to={`/deals/${deal.id}/show`}>Back to deal</Link>
           </Button>

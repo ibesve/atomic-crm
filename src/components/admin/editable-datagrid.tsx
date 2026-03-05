@@ -55,7 +55,7 @@ export interface EditableColumnDef<RecordType extends RaRecord = RaRecord> {
   source: string;
   label: string;
   editable?: boolean;
-  type?: "text" | "number" | "select" | "reference";
+  type?: "text" | "number" | "select" | "reference" | "boolean";
   options?: { value: string; label: string }[];
   referenceResource?: string;
   referenceData?: RaRecord[]; // NEU: Referenzdaten können direkt übergeben werden

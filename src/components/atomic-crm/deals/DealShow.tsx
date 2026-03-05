@@ -10,7 +10,8 @@ import {
   useRefresh,
   useUpdate,
 } from "ra-core";
-import { DeleteButton } from "@/components/admin/delete-button";
+import { SoftDeleteButton } from "@/components/admin/soft-delete-button";
+import { RevisionsButton } from "@/components/admin/revisions-button";
 import { EditButton } from "@/components/admin/edit-button";
 import { ReferenceArrayField } from "@/components/admin/reference-array-field";
 import { ReferenceField } from "@/components/admin/reference-field";
@@ -73,7 +74,7 @@ const DealShowContent = () => {
               {record.archived_at ? (
                 <>
                   <UnarchiveButton record={record} />
-                  <DeleteButton />
+                  <SoftDeleteButton />
                 </>
               ) : (
                 <>

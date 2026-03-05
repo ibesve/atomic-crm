@@ -10,6 +10,7 @@ import {
 import { X, Pencil } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Switch } from "@/components/ui/switch";
 import {
   Select,
   SelectContent,
@@ -26,7 +27,7 @@ interface EditableCellProps<RecordType extends RaRecord = RaRecord> {
   source: string;
   resource: string;
   children?: ReactNode;
-  type?: "text" | "number" | "select" | "reference";
+  type?: "text" | "number" | "select" | "reference" | "boolean";
   options?: { value: string; label: string }[];
   referenceData?: RaRecord[];
   renderDisplay?: (value: unknown, record: RecordType) => ReactNode;
@@ -183,6 +184,58 @@ export function EditableCell<RecordType extends RaRecord = RaRecord>({
   if (!record) return null;
 
   const currentValue = getNestedValue(record, source);
+
+  // Boolean fields render as a Switch (no edit mode needed — toggle saves immediately)
+  if (type === "boolean") {
+    const boolVal = Boolean(
+      getEditValue ? getEditValue(record) : currentValue,
+    );
+    return (
+      <TableCell
+        className={cn("py-1", className)}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center gap-2">
+          <Switch
+            checked={boolVal}
+            disabled={isPending}
+            onCheckedChange={(checked) => {
+              if (!record) return;
+              update(
+                resource,
+                {
+                  id: record.id,
+                  data: transformValue
+                    ? transformValue(checked, record)
+                    : { [source]: checked },
+                  previousData: record,
+                },
+                {
+                  onSuccess: () => {
+                    notify(
+                      translate("ra.notification.updated", { smart_count: 1 }),
+                      { type: "success" },
+                    );
+                    refresh();
+                  },
+                  onError: (err: Error) => {
+                    notify(
+                      err.message ||
+                        translate("ra.notification.http_error"),
+                      { type: "error" },
+                    );
+                  },
+                },
+              );
+            }}
+          />
+          <span className="text-xs text-muted-foreground">
+            {boolVal ? "Ja" : "Nein"}
+          </span>
+        </div>
+      </TableCell>
+    );
+  }
 
   if (isEditing) {
     return (

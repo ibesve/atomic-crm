@@ -11,6 +11,7 @@ import {
   User,
   Users,
   History,
+  Trash2,
   Box,
 } from "lucide-react";
 import {
@@ -256,6 +257,19 @@ export const AppSidebar = () => {
                   <Link to="/audit">
                     <History />
                     <span>{translate("crm.audit_log.title", { _: "Änderungsprotokoll" })}</span>
+                  </Link>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+
+              <SidebarMenuItem>
+                <SidebarMenuButton
+                  asChild
+                  isActive={isActive("/deleted")}
+                  tooltip={translate("ra-soft-delete.page_title", { _: "Papierkorb" })}
+                >
+                  <Link to="/deleted">
+                    <Trash2 />
+                    <span>{translate("ra-soft-delete.page_title", { _: "Papierkorb" })}</span>
                   </Link>
                 </SidebarMenuButton>
               </SidebarMenuItem>

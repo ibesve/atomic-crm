@@ -7,6 +7,14 @@ import {
   type ResourceCallbacks,
 } from "ra-core";
 import type {
+  SoftDeleteDataProvider,
+  DeletedRecordType,
+  RecordRevision,
+} from "@react-admin/ra-core-ee";
+import { addRealTimeMethodsBasedOnSupabase } from "@react-admin/ra-realtime";
+import { addSearchMethod } from "@react-admin/ra-search";
+import { addTreeMethodsBasedOnParentAndPosition } from "@react-admin/ra-tree";
+import type {
   ContactNote,
   Deal,
   DealNote,
@@ -20,6 +28,16 @@ import { getActivityLog } from "../commons/activity";
 import { ATTACHMENTS_BUCKET } from "../commons/attachments";
 import { getIsInitialized } from "./authProvider";
 import { supabase } from "./supabase";
+
+// ── Soft-deletable resources ──────────────────────────────────────────
+const SOFT_DELETABLE_RESOURCES: Record<string, { deletedAtFieldName: string }> = {
+  contacts: { deletedAtFieldName: "deleted_at" },
+  companies: { deletedAtFieldName: "deleted_at" },
+  deals: { deletedAtFieldName: "deleted_at" },
+  tasks: { deletedAtFieldName: "deleted_at" },
+  contact_notes: { deletedAtFieldName: "deleted_at" },
+  deal_notes: { deletedAtFieldName: "deleted_at" },
+};
 
 // ── Custom Field helpers ──────────────────────────────────────────────
 // Temporary storage for _cf_ values stripped in beforeSave,
@@ -282,14 +300,21 @@ const processCompanyLogo = async (params: any) => {
 const dataProviderWithCustomMethods = {
   ...baseDataProvider,
   async getList(resource: string, params: GetListParams) {
+    // Auto-filter soft-deleted records for soft-deletable resources
+    const sdCfg = SOFT_DELETABLE_RESOURCES[resource];
+    const filter = sdCfg
+      ? { ...params.filter, [`${sdCfg.deletedAtFieldName}@is`]: "null" }
+      : params.filter;
+    const patchedParams = { ...params, filter };
+
     if (resource === "companies") {
-      return baseDataProvider.getList("companies_summary", params);
+      return baseDataProvider.getList("companies_summary", patchedParams);
     }
     if (resource === "contacts") {
-      return baseDataProvider.getList("contacts_summary", params);
+      return baseDataProvider.getList("contacts_summary", patchedParams);
     }
 
-    return baseDataProvider.getList(resource, params);
+    return baseDataProvider.getList(resource, patchedParams);
   },
   async getOne(resource: string, params: any) {
     if (resource === "companies") {
@@ -454,7 +479,315 @@ const dataProviderWithCustomMethods = {
     });
     return data.config as ConfigurationContextValue;
   },
-} satisfies DataProvider;
+
+  // ── EE: Soft Delete methods (addSoftDeleteInPlace-compatible) ──────
+  async softDelete(resource: string, params: { id: Identifier; authorId?: Identifier; previousData?: any; meta?: any }) {
+    const cfg = SOFT_DELETABLE_RESOURCES[resource];
+    if (!cfg) throw new Error(`Resource "${resource}" does not support soft delete.`);
+
+    let recordToDelete = params.previousData;
+    if (!recordToDelete) {
+      recordToDelete = (await baseDataProvider.getOne(resource, { id: params.id })).data;
+    }
+
+    const result = await baseDataProvider.update(resource, {
+      id: params.id,
+      data: { [cfg.deletedAtFieldName]: new Date().toISOString() },
+      previousData: recordToDelete,
+    });
+
+    const deletedRecord: DeletedRecordType = {
+      id: `${resource}:${params.id}`,
+      resource,
+      deleted_at: result.data[cfg.deletedAtFieldName],
+      deleted_by: params.authorId ?? null,
+      data: recordToDelete,
+    };
+
+    // Audit log
+    createAuditLogEntry({
+      action: "delete",
+      resourceType: resource,
+      resourceId: params.id as number,
+      resourceName: getRecordName(resource, recordToDelete),
+      oldValues: recordToDelete,
+    });
+
+    return { data: recordToDelete, deletedRecord };
+  },
+
+  async softDeleteMany(resource: string, params: { ids: Identifier[]; authorId?: Identifier; meta?: any }) {
+    const cfg = SOFT_DELETABLE_RESOURCES[resource];
+    if (!cfg) throw new Error(`Resource "${resource}" does not support soft delete.`);
+
+    await Promise.all(
+      params.ids.map((id) =>
+        baseDataProvider.update(resource, {
+          id,
+          data: { [cfg.deletedAtFieldName]: new Date().toISOString() },
+          previousData: { id },
+        })
+      )
+    );
+
+    const { data: records } = await baseDataProvider.getMany(resource, { ids: params.ids });
+    const deletedRecords: DeletedRecordType[] = records.map((r: any) => ({
+      id: `${resource}:${r.id}`,
+      resource,
+      deleted_at: r[cfg.deletedAtFieldName],
+      deleted_by: params.authorId ?? null,
+      data: r,
+    }));
+
+    return { data: params.ids, deletedRecords };
+  },
+
+  async getOneDeleted(params: { id: Identifier; meta?: any }) {
+    const idStr = String(params.id);
+    const sepIdx = idStr.lastIndexOf(":");
+    const resource = idStr.slice(0, sepIdx);
+    const recordId = idStr.slice(sepIdx + 1);
+    const cfg = SOFT_DELETABLE_RESOURCES[resource];
+    if (!cfg) throw new Error(`Invalid deleted record id: ${params.id}`);
+
+    const result = await baseDataProvider.getOne(resource, { id: recordId });
+    return {
+      data: {
+        id: idStr,
+        resource,
+        deleted_at: result.data[cfg.deletedAtFieldName],
+        deleted_by: result.data.deleted_by ?? null,
+        data: result.data,
+      } as DeletedRecordType,
+    };
+  },
+
+  async getListDeleted(params: any) {
+    const resources = Object.keys(SOFT_DELETABLE_RESOURCES);
+    const allDeleted: DeletedRecordType[] = [];
+
+    // Fetch soft-deleted records from each resource
+    for (const resource of resources) {
+      const cfg = SOFT_DELETABLE_RESOURCES[resource];
+      try {
+        const { data } = await baseDataProvider.getList(resource, {
+          pagination: { page: 1, perPage: 200 },
+          sort: params?.sort ?? { field: cfg.deletedAtFieldName, order: "DESC" },
+          filter: { ...params?.filter, [`${cfg.deletedAtFieldName}@not.is`]: "null" },
+        });
+        for (const record of data) {
+          allDeleted.push({
+            id: `${resource}:${record.id}`,
+            resource,
+            deleted_at: record[cfg.deletedAtFieldName],
+            deleted_by: record.deleted_by ?? null,
+            data: record,
+          });
+        }
+      } catch {
+        // Skip resources that may not support the query
+      }
+    }
+
+    // Sort by deleted_at descending
+    allDeleted.sort((a, b) => new Date(b.deleted_at).getTime() - new Date(a.deleted_at).getTime());
+
+    const page = params?.pagination?.page ?? 1;
+    const perPage = params?.pagination?.perPage ?? 25;
+    const start = (page - 1) * perPage;
+    return {
+      data: allDeleted.slice(start, start + perPage),
+      total: allDeleted.length,
+    };
+  },
+
+  async restoreOne(params: { id: Identifier; meta?: any }) {
+    const idStr = String(params.id);
+    const sepIdx = idStr.lastIndexOf(":");
+    const resource = idStr.slice(0, sepIdx);
+    const recordId = idStr.slice(sepIdx + 1);
+    const cfg = SOFT_DELETABLE_RESOURCES[resource];
+    if (!cfg) throw new Error(`Invalid deleted record id: ${params.id}`);
+
+    const recordBefore = (await baseDataProvider.getOne(resource, { id: recordId })).data;
+    await baseDataProvider.update(resource, {
+      id: recordId,
+      data: { [cfg.deletedAtFieldName]: null },
+      previousData: recordBefore,
+    });
+
+    createAuditLogEntry({
+      action: "restore",
+      resourceType: resource,
+      resourceId: recordId as unknown as number,
+      resourceName: getRecordName(resource, recordBefore),
+    });
+
+    return {
+      data: {
+        id: idStr,
+        resource,
+        deleted_at: recordBefore[cfg.deletedAtFieldName],
+        deleted_by: recordBefore.deleted_by ?? null,
+        data: recordBefore,
+      } as DeletedRecordType,
+    };
+  },
+
+  async restoreMany(params: { ids: Identifier[]; meta?: any }) {
+    const idsByResource: Record<string, string[]> = {};
+    for (const id of params.ids) {
+      const idStr = String(id);
+      const sepIdx = idStr.lastIndexOf(":");
+      const resource = idStr.slice(0, sepIdx);
+      const recordId = idStr.slice(sepIdx + 1);
+      (idsByResource[resource] ??= []).push(recordId);
+    }
+
+    const restored: DeletedRecordType[] = [];
+    for (const [resource, recordIds] of Object.entries(idsByResource)) {
+      const cfg = SOFT_DELETABLE_RESOURCES[resource];
+      if (!cfg) continue;
+      const { data: records } = await baseDataProvider.getMany(resource, { ids: recordIds });
+      for (const r of records) {
+        restored.push({
+          id: `${resource}:${r.id}`,
+          resource,
+          deleted_at: r[cfg.deletedAtFieldName],
+          deleted_by: r.deleted_by ?? null,
+          data: r,
+        });
+      }
+      await Promise.all(
+        recordIds.map((id) =>
+          baseDataProvider.update(resource, {
+            id,
+            data: { [cfg.deletedAtFieldName]: null },
+            previousData: { id },
+          })
+        )
+      );
+    }
+
+    return { data: restored };
+  },
+
+  async hardDelete(params: { id: Identifier; previousData?: any; meta?: any }) {
+    const idStr = String(params.id);
+    const sepIdx = idStr.lastIndexOf(":");
+    const resource = idStr.slice(0, sepIdx);
+    const recordId = idStr.slice(sepIdx + 1);
+
+    const result = await baseDataProvider.delete(resource, { id: recordId, previousData: params.previousData });
+    return {
+      data: {
+        id: idStr,
+        resource,
+        deleted_at: result.data?.[SOFT_DELETABLE_RESOURCES[resource]?.deletedAtFieldName] ?? null,
+        deleted_by: null,
+        data: result.data,
+      } as DeletedRecordType,
+    };
+  },
+
+  async hardDeleteMany(params: { ids: Identifier[]; meta?: any }) {
+    const idsByResource: Record<string, string[]> = {};
+    for (const id of params.ids) {
+      const idStr = String(id);
+      const sepIdx = idStr.lastIndexOf(":");
+      const resource = idStr.slice(0, sepIdx);
+      const recordId = idStr.slice(sepIdx + 1);
+      (idsByResource[resource] ??= []).push(recordId);
+    }
+
+    for (const [resource, recordIds] of Object.entries(idsByResource)) {
+      await baseDataProvider.deleteMany(resource, { ids: recordIds });
+    }
+
+    return { data: params.ids, meta: [] };
+  },
+
+  // ── EE: Revision / History methods ─────────────────────────────────
+  async getRevisions(resource: string, params: { recordId: Identifier }) {
+    const { data } = await baseDataProvider.getList("record_versions", {
+      pagination: { page: 1, perPage: 1000 },
+      sort: { field: "created_at", order: "DESC" },
+      filter: { resource_type: resource, resource_id: params.recordId },
+    });
+
+    // Map our DB schema → EE RecordRevision shape
+    return {
+      data: data.map((row: any): RecordRevision => ({
+        id: row.id,
+        resource,
+        recordId: row.resource_id,
+        date: row.created_at,
+        message: row.change_summary ?? "",
+        authorId: row.created_by,
+        data: row.data,
+      })),
+      total: data.length,
+    };
+  },
+
+  async addRevision(resource: string, params: {
+    recordId: Identifier;
+    data: any;
+    authorId?: Identifier;
+    message?: string;
+    description?: string;
+  }) {
+    // Determine next version number
+    const { data: existing } = await baseDataProvider.getList("record_versions", {
+      pagination: { page: 1, perPage: 1 },
+      sort: { field: "version_number", order: "DESC" },
+      filter: { resource_type: resource, resource_id: params.recordId },
+    });
+    const nextVersion = existing.length > 0 ? (existing[0] as any).version_number + 1 : 1;
+
+    const { data: { user } } = await supabase.auth.getUser();
+
+    const result = await baseDataProvider.create("record_versions", {
+      data: {
+        resource_type: resource,
+        resource_id: params.recordId,
+        version_number: nextVersion,
+        data: params.data,
+        change_summary: params.message ?? params.description ?? null,
+        created_by: params.authorId ?? user?.id ?? null,
+        created_by_email: user?.email ?? null,
+      },
+    });
+
+    return {
+      data: {
+        id: result.data.id,
+        resource,
+        recordId: params.recordId,
+        date: result.data.created_at,
+        message: params.message ?? "",
+        authorId: params.authorId ?? user?.id ?? null,
+        data: params.data,
+      } as RecordRevision,
+    };
+  },
+
+  async deleteRevisions(resource: string, params: { recordId: Identifier }) {
+    const { data: existing } = await baseDataProvider.getList("record_versions", {
+      pagination: { page: 1, perPage: 1000 },
+      sort: { field: "id", order: "ASC" },
+      filter: { resource_type: resource, resource_id: params.recordId },
+    });
+
+    if (existing.length > 0) {
+      await baseDataProvider.deleteMany("record_versions", {
+        ids: existing.map((r: any) => r.id),
+      });
+    }
+
+    return { data: existing.map((r: any) => r.id) };
+  },
+} satisfies DataProvider & Partial<SoftDeleteDataProvider>;
 
 export type CrmDataProvider = typeof dataProviderWithCustomMethods;
 
@@ -691,10 +1024,78 @@ const lifeCycleCallbacks: ResourceCallbacks[] = [
   },
 ];
 
-export const dataProvider = withLifecycleCallbacks(
+// ── Apply lifecycle callbacks ─────────────────────────────────────────
+const dataProviderWithCallbacks = withLifecycleCallbacks(
   dataProviderWithCustomMethods,
   lifeCycleCallbacks,
-) as CrmDataProvider;
+);
+
+// ── Layer 1: Add Supabase Realtime (subscribe/unsubscribe/publish) ────
+const dataProviderWithRealtime = addRealTimeMethodsBasedOnSupabase({
+  dataProvider: dataProviderWithCallbacks,
+  supabaseClient: supabase,
+});
+
+// ── Layer 2: Add global search method ─────────────────────────────────
+const dataProviderWithSearch = addSearchMethod(dataProviderWithRealtime, {
+  contacts: {
+    label: (record: any) =>
+      `${record.first_name ?? ""} ${record.last_name ?? ""}`.trim() || `Kontakt #${record.id}`,
+    description: (record: any) =>
+      [record.email_jsonb?.[0]?.email, record.company_name].filter(Boolean).join(" – "),
+  },
+  companies: {
+    label: "name",
+    description: (record: any) =>
+      [record.sector, record.city].filter(Boolean).join(", "),
+  },
+  deals: {
+    label: "name",
+    description: (record: any) =>
+      [record.category, record.stage, record.amount ? `€${record.amount}` : null].filter(Boolean).join(" – "),
+  },
+});
+
+// ── Layer 3: Add tree methods (parent_id + position based) ────────────
+// Note: addTreeMethodsBasedOnParentAndPosition does NOT spread the base
+// data provider — it returns only tree methods. We merge manually.
+const treeMethods = addTreeMethodsBasedOnParentAndPosition({
+  dataProvider: dataProviderWithSearch,
+  parentIdField: "parent_id",
+  positionField: "position",
+}) as any;
+
+// ── Re-attach custom methods lost during wrapping ─────────────────────
+export const dataProvider = {
+  // Core data provider methods (from search wrapper, which includes realtime + lifecycle)
+  ...dataProviderWithSearch,
+  // Tree methods (getTree, getRootNodes, addChildNode, etc.)
+  ...treeMethods,
+  // Custom CRM methods
+  signUp: dataProviderWithCustomMethods.signUp,
+  salesCreate: dataProviderWithCustomMethods.salesCreate,
+  salesUpdate: dataProviderWithCustomMethods.salesUpdate,
+  updatePassword: dataProviderWithCustomMethods.updatePassword,
+  unarchiveDeal: dataProviderWithCustomMethods.unarchiveDeal,
+  getActivityLog: dataProviderWithCustomMethods.getActivityLog,
+  isInitialized: dataProviderWithCustomMethods.isInitialized,
+  mergeContacts: dataProviderWithCustomMethods.mergeContacts,
+  getConfiguration: dataProviderWithCustomMethods.getConfiguration,
+  updateConfiguration: dataProviderWithCustomMethods.updateConfiguration,
+  // Soft-delete methods
+  softDelete: dataProviderWithCustomMethods.softDelete,
+  softDeleteMany: dataProviderWithCustomMethods.softDeleteMany,
+  getOneDeleted: dataProviderWithCustomMethods.getOneDeleted,
+  getListDeleted: dataProviderWithCustomMethods.getListDeleted,
+  restoreOne: dataProviderWithCustomMethods.restoreOne,
+  restoreMany: dataProviderWithCustomMethods.restoreMany,
+  hardDelete: dataProviderWithCustomMethods.hardDelete,
+  hardDeleteMany: dataProviderWithCustomMethods.hardDeleteMany,
+  // Revision / History methods
+  getRevisions: dataProviderWithCustomMethods.getRevisions,
+  addRevision: dataProviderWithCustomMethods.addRevision,
+  deleteRevisions: dataProviderWithCustomMethods.deleteRevisions,
+} as CrmDataProvider;
 
 const applyFullTextSearch = (columns: string[]) => (params: GetListParams) => {
   if (!params.filter?.q) {

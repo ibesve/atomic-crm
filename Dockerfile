@@ -10,8 +10,8 @@ FROM node:22-alpine AS build
 WORKDIR /app
 
 # Install dependencies first (layer cache)
-COPY package.json package-lock.json ./
-RUN npm ci --ignore-scripts
+COPY package.json package-lock.json .npmrc ./
+RUN npm ci --ignore-scripts && rm -f .npmrc
 
 # Copy source
 COPY . .

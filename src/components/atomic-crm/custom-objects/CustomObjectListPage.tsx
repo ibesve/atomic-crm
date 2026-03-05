@@ -87,6 +87,7 @@ import type {
   CustomFieldDefinition,
   CustomFieldType,
 } from "../types/custom-objects";
+import { CustomObjectQuickView } from "./CustomObjectQuickView";
 
 // Icon mapping for field types
 const FIELD_TYPE_ICON: Record<CustomFieldType, React.ElementType> = {
@@ -108,6 +109,134 @@ const FIELD_TYPE_ICON: Record<CustomFieldType, React.ElementType> = {
 };
 
 /**
+ * Loads entries from a referenced resource and renders a Select dropdown.
+ * Supports built-in resources (contacts, companies, deals, sales) and custom objects.
+ */
+function ReferenceFieldSelect({
+  field,
+  value,
+  onChange,
+}: {
+  field: CustomFieldDefinition;
+  value: unknown;
+  onChange: (v: string) => void;
+}) {
+  const refObj = field.reference_object;
+  const displayField = field.reference_display_field || "name";
+  const [filterText, setFilterText] = useState("");
+
+  // Determine the RA resource name
+  const resource = useMemo(() => {
+    if (!refObj) return null;
+    if (refObj.startsWith("custom_")) return "custom_object_data";
+    return refObj;
+  }, [refObj]);
+
+  // For custom objects, look up the definition to filter by object_definition_id
+  const { data: customDefs } = useGetList<CustomObjectDefinition>(
+    "custom_object_definitions",
+    {
+      pagination: { page: 1, perPage: 100 },
+      sort: { field: "name", order: "ASC" },
+      filter: refObj?.startsWith("custom_")
+        ? { name: refObj.replace("custom_", "") }
+        : { id: -1 },
+    },
+  );
+  const customDefId = customDefs?.[0]?.id;
+
+  const dataFilter = useMemo(() => {
+    if (!resource) return { id: -1 };
+    if (resource === "custom_object_data" && customDefId)
+      return { object_definition_id: customDefId };
+    return {};
+  }, [resource, customDefId]);
+
+  const { data: refData } = useGetList(resource ?? "contacts", {
+    pagination: { page: 1, perPage: 200 },
+    sort: { field: "id", order: "ASC" },
+    filter: dataFilter,
+  });
+
+  const choices = useMemo(() => {
+    if (!refData || !resource) return [];
+    return refData.map((r: Record<string, unknown>) => {
+      const id = String(r.id);
+      let label: string;
+      if (resource === "custom_object_data") {
+        const d = (r.data || {}) as Record<string, unknown>;
+        label =
+          String(d[displayField] || d.name || d.title || d.label || "") ||
+          `#${r.id}`;
+      } else if (resource === "contacts") {
+        label =
+          [r.first_name, r.last_name].filter(Boolean).join(" ") || `#${r.id}`;
+      } else if (resource === "sales") {
+        label =
+          [r.first_name, r.last_name].filter(Boolean).join(" ") || `#${r.id}`;
+      } else {
+        label = String(r.name || r.title || r.label || `#${r.id}`);
+      }
+      return { value: id, label };
+    });
+  }, [refData, resource, displayField]);
+
+  const filtered = useMemo(() => {
+    if (!filterText.trim()) return choices;
+    const q = filterText.toLowerCase();
+    return choices.filter((c) => c.label.toLowerCase().includes(q));
+  }, [choices, filterText]);
+
+  if (!refObj) {
+    return (
+      <p className="text-xs text-amber-600">
+        Kein Referenz-Objekt konfiguriert. Bitte unter Administration → Custom Fields ein Zielobjekt zuweisen.
+      </p>
+    );
+  }
+
+  return (
+    <div className="space-y-1.5">
+      {choices.length > 8 && (
+        <div className="relative">
+          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+          <Input
+            value={filterText}
+            onChange={(e) => setFilterText(e.target.value)}
+            placeholder="Einträge filtern…"
+            className="pl-8 h-8 text-sm"
+          />
+        </div>
+      )}
+      <Select
+        value={String(value ?? "")}
+        onValueChange={onChange}
+      >
+        <SelectTrigger>
+          <SelectValue placeholder="Verknüpfung auswählen…" />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="__clear__">– Keine Verknüpfung –</SelectItem>
+          {filtered.map((opt) => (
+            <SelectItem key={opt.value} value={opt.value}>
+              {opt.label}
+            </SelectItem>
+          ))}
+          {filtered.length === 0 && filterText && (
+            <div className="px-2 py-1.5 text-xs text-muted-foreground">
+              Keine Einträge für "{filterText}" gefunden.
+            </div>
+          )}
+        </SelectContent>
+      </Select>
+      <p className="text-xs text-muted-foreground">
+        {choices.length} {choices.length === 1 ? "Eintrag" : "Einträge"} verfügbar
+      </p>
+    </div>
+  );
+}
+
+/**
  * Full CRUD page for a custom object type.
  * Accessed via /custom-objects/:objectName
  */
@@ -126,6 +255,7 @@ export const CustomObjectListPage = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [sortField, setSortField] = useState<string>("created_at");
   const [sortOrder, setSortOrder] = useState<"ASC" | "DESC">("DESC");
+  const [quickViewEntry, setQuickViewEntry] = useState<Record<string, unknown> | null>(null);
 
   const [create] = useCreate();
   const [update] = useUpdate();
@@ -462,6 +592,17 @@ export const CustomObjectListPage = () => {
               </SelectContent>
             </Select>
           </div>
+        ) : field.field_type === "reference" ? (
+          <ReferenceFieldSelect
+            field={field}
+            value={value}
+            onChange={(v) =>
+              setFormData((prev) => ({
+                ...prev,
+                [field.name]: v === "__clear__" ? null : v,
+              }))
+            }
+          />
         ) : field.field_type === "rating" ? (
           <div className="flex items-center gap-1">
             {[1, 2, 3, 4, 5].map((star) => (
@@ -660,7 +801,11 @@ export const CustomObjectListPage = () => {
                     .map((entry: Record<string, unknown>) => {
                       const data = (entry.data || {}) as Record<string, unknown>;
                       return (
-                        <TableRow key={entry.id as number} className="group">
+                        <TableRow
+                          key={entry.id as number}
+                          className="group cursor-pointer hover:bg-accent/50"
+                          onClick={() => setQuickViewEntry(entry)}
+                        >
                           {displayFields.map((field) => (
                             <TableCell key={field.id}>
                               {formatFieldValue(data[field.name], field)}
@@ -685,12 +830,16 @@ export const CustomObjectListPage = () => {
                                 </Button>
                               </DropdownMenuTrigger>
                               <DropdownMenuContent align="end">
-                                <DropdownMenuItem onClick={() => openEditDialog(entry)}>
+                                <DropdownMenuItem onClick={(e) => { e.stopPropagation(); setQuickViewEntry(entry); }}>
+                                  <Pencil className="h-4 w-4 mr-2" />
+                                  QuickView
+                                </DropdownMenuItem>
+                                <DropdownMenuItem onClick={(e) => { e.stopPropagation(); openEditDialog(entry); }}>
                                   <Pencil className="h-4 w-4 mr-2" />
                                   Bearbeiten
                                 </DropdownMenuItem>
                                 <DropdownMenuItem
-                                  onClick={() => setDeleteConfirmEntry(entry)}
+                                  onClick={(e) => { e.stopPropagation(); setDeleteConfirmEntry(entry); }}
                                   className="text-red-600"
                                 >
                                   <Trash2 className="h-4 w-4 mr-2" />
@@ -759,6 +908,16 @@ export const CustomObjectListPage = () => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* QuickView Sheet */}
+      <CustomObjectQuickView
+        open={!!quickViewEntry}
+        onOpenChange={(open) => !open && setQuickViewEntry(null)}
+        entry={quickViewEntry}
+        objectDef={objectDef || null}
+        fieldDefs={fieldDefs || []}
+        onDelete={(e) => setDeleteConfirmEntry(e)}
+      />
 
       {/* Delete Confirmation */}
       <AlertDialog

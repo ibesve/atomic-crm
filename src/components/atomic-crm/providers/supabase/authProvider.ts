@@ -1,8 +1,51 @@
 import type { AuthProvider } from "ra-core";
 import { supabaseAuthProvider } from "ra-supabase-core";
+import {
+  canAccessWithPermissions,
+  getPermissionsFromRoles,
+  type Permission,
+  type RoleDefinitions,
+} from "@react-admin/ra-core-ee";
 
-import { canAccess } from "../commons/canAccess";
 import { supabase } from "./supabase";
+
+// ── Role definitions for ra-rbac ──────────────────────────────────────
+const roleDefinitions: RoleDefinitions = {
+  admin: [
+    { resource: "*", action: "*" },
+  ],
+  user: [
+    { resource: "contacts", action: ["list", "show", "create", "edit", "delete", "export"] },
+    { resource: "companies", action: ["list", "show", "create", "edit", "delete", "export"] },
+    { resource: "deals", action: ["list", "show", "create", "edit", "delete", "export"] },
+    { resource: "tasks", action: ["list", "show", "create", "edit", "delete"] },
+    { resource: "contact_notes", action: ["list", "show", "create", "edit", "delete"] },
+    { resource: "deal_notes", action: ["list", "show", "create", "edit", "delete"] },
+    { resource: "tags", action: ["list", "show", "create", "edit", "delete"] },
+    { resource: "audit_logs", action: ["list", "show"] },
+    { resource: "record_versions", action: ["list", "show"] },
+    { resource: "custom_object_definitions", action: ["list", "show"] },
+    { resource: "custom_field_definitions", action: ["list", "show"] },
+    { resource: "custom_field_values", action: ["list", "show", "create", "edit"] },
+    { resource: "custom_object_data", action: ["list", "show", "create", "edit", "delete"] },
+    { resource: "object_relationships", action: ["list", "show"] },
+    { resource: "relationship_definitions", action: ["list", "show"] },
+    // Explicitly deny admin-only resources
+    { type: "deny", resource: "sales", action: "*" },
+    { type: "deny", resource: "configuration", action: "*" },
+    { type: "deny", resource: "roles", action: "*" },
+    { type: "deny", resource: "role_permissions", action: "*" },
+    { type: "deny", resource: "teams", action: "*" },
+    { type: "deny", resource: "team_members", action: "*" },
+    { type: "deny", resource: "user_roles", action: "*" },
+    { type: "deny", resource: "team_roles", action: "*" },
+    { type: "deny", resource: "attribute_definitions", action: "*" },
+    { type: "deny", resource: "user_attributes", action: "*" },
+    { type: "deny", resource: "permission_conditions", action: "*" },
+  ],
+};
+
+export { roleDefinitions };
 
 const baseAuthProvider = supabaseAuthProvider(supabase, {
   getIdentity: async () => {
@@ -147,9 +190,29 @@ export const authProvider: AuthProvider = {
     const sale = await getSale();
     if (sale == null) return false;
 
-    // Compute access rights from the sale role
+    // Compute permissions from role definitions using ra-rbac
     const role = sale.administrator ? "admin" : "user";
-    return canAccess(role, params);
+    const permissions = getPermissionsFromRoles({
+      roleDefinitions,
+      userRoles: [role],
+    });
+
+    return canAccessWithPermissions({
+      permissions,
+      action: params.action,
+      resource: params.resource,
+      record: params.record,
+    });
+  },
+  getPermissions: async () => {
+    const sale = await getSale();
+    if (sale == null) return [];
+
+    const role = sale.administrator ? "admin" : "user";
+    return getPermissionsFromRoles({
+      roleDefinitions,
+      userRoles: [role],
+    });
   },
   getAuthorizationDetails(authorizationId: string) {
     return supabase.auth.oauth.getAuthorizationDetails(authorizationId);
