@@ -1,39 +1,41 @@
-import { fetchWithTimeout } from "../../misc/fetchWithTimeout";
-import { DOMAINS_NOT_SUPPORTING_FAVICON } from "../../misc/unsupportedDomains.const";
 import type { Contact } from "../../types";
 
-export async function hash(string: string) {
-  const utf8 = new TextEncoder().encode(string);
-  const hashBuffer = await crypto.subtle.digest("SHA-256", utf8);
-  const hashArray = Array.from(new Uint8Array(hashBuffer));
-  const hashHex = hashArray
-    .map((bytes) => bytes.toString(16).padStart(2, "0"))
-    .join("");
-  return hashHex;
+/**
+ * Generate a deterministic color from a string (name/email).
+ * Returns an HSL color with good contrast for white text.
+ */
+function stringToColor(str: string): string {
+  let hash = 0;
+  for (let i = 0; i < str.length; i++) {
+    hash = str.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  const hue = Math.abs(hash) % 360;
+  return `hsl(${hue}, 55%, 45%)`;
 }
 
-// Helper function to get the Gravatar URL
-async function getGravatarUrl(email: string): Promise<string> {
-  const hashEmail = await hash(email);
-  return `https://www.gravatar.com/avatar/${hashEmail}?d=404`;
-}
+/**
+ * Generate a local SVG data-URI avatar with the contact's initials.
+ * NO external requests — all data stays in-house.
+ */
+function generateInitialsAvatar(
+  name: string,
+  email: string,
+): string {
+  const initials = name
+    ? name
+        .split(/\s+/)
+        .map((part) => part.charAt(0).toUpperCase())
+        .slice(0, 2)
+        .join("")
+    : email.charAt(0).toUpperCase();
 
-// Helper function to get the favicon URL
-async function getFaviconUrl(domain: string): Promise<string | null> {
-  if (DOMAINS_NOT_SUPPORTING_FAVICON.includes(domain)) {
-    return null;
-  }
+  const bg = stringToColor(email || name);
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 40 40">
+    <rect width="40" height="40" rx="20" fill="${bg}"/>
+    <text x="20" y="20" text-anchor="middle" dy=".35em" fill="white" font-family="system-ui,sans-serif" font-size="16" font-weight="600">${initials}</text>
+  </svg>`;
 
-  try {
-    const faviconUrl = `https://${domain}/favicon.ico`;
-    const response = await fetchWithTimeout(faviconUrl);
-    if (response.ok) {
-      return faviconUrl;
-    }
-  } catch {
-    return null;
-  }
-  return null;
+  return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
 }
 
 // Main function to get the avatar URL
@@ -44,27 +46,13 @@ export async function getContactAvatar(
     return null;
   }
 
-  for (const { email } of record.email_jsonb) {
-    // Step 1: Try to get Gravatar image
-    const gravatarUrl = await getGravatarUrl(email);
-    try {
-      const gravatarResponse = await fetch(gravatarUrl);
-      if (gravatarResponse.ok) {
-        return gravatarUrl;
-      }
-    } catch {
-      // Gravatar not found
-    }
-
-    // Step 2: Try to get favicon from email domain
-    const domain = email.split("@")[1];
-    const faviconUrl = await getFaviconUrl(domain);
-    if (faviconUrl) {
-      return faviconUrl;
-    }
-
-    // TODO: Step 3: Try to get image from LinkedIn.
+  const firstEmail = record.email_jsonb[0]?.email;
+  if (!firstEmail) {
+    return null;
   }
 
-  return null;
+  const displayName =
+    [record.first_name, record.last_name].filter(Boolean).join(" ") || "";
+
+  return generateInitialsAvatar(displayName, firstEmail);
 }
