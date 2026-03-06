@@ -25,6 +25,8 @@ const Header = () => {
     currentPath = "/companies-quickview";
   } else if (matchPath("/companies/*", location.pathname)) {
     currentPath = "/companies";
+  } else if (matchPath("/deals-quickview", location.pathname)) {
+    currentPath = "/deals-quickview";
   } else if (matchPath("/deals/*", location.pathname)) {
     currentPath = "/deals";
   } else {
@@ -84,6 +86,11 @@ const Header = () => {
                     label={translate("crm.deals")}
                     to="/deals"
                     isActive={currentPath === "/deals"}
+                  />
+                  <NavigationTab
+                    label={translate("crm.deals_quickview", { _: "Deals (Quickview)" })}
+                    to="/deals-quickview"
+                    isActive={currentPath === "/deals-quickview"}
                   />
                 </nav>
               </div>

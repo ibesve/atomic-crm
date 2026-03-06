@@ -68,8 +68,38 @@ export const RolePermissionsEditor = ({ roleId }: { roleId: number }) => {
       });
 
       data.forEach(perm => {
-        if (matrix[perm.resource]) {
-          matrix[perm.resource][perm.action] = perm.scope;
+        // Handle wildcard resource: applies to ALL resources
+        if (perm.resource === '*') {
+          const scope = perm.scope as PermissionScope;
+          RESOURCES.forEach(res => {
+            if (perm.action === '*') {
+              // Wildcard action: set all actions
+              ACTIONS.forEach(act => { matrix[res][act] = scope; });
+            } else {
+              // Single or comma-separated actions
+              const actions = perm.action.includes(',') ? perm.action.split(',').map((a: string) => a.trim()) : [perm.action];
+              actions.forEach((act: string) => {
+                if (matrix[res]?.[act] !== undefined) {
+                  matrix[res][act] = scope;
+                }
+              });
+            }
+          });
+        } else if (matrix[perm.resource]) {
+          if (perm.action === '*') {
+            // Wildcard action on specific resource: set all actions
+            ACTIONS.forEach(act => {
+              matrix[perm.resource][act] = perm.scope as PermissionScope;
+            });
+          } else {
+            // Single or comma-separated actions
+            const actions = perm.action.includes(',') ? perm.action.split(',').map((a: string) => a.trim()) : [perm.action];
+            actions.forEach((act: string) => {
+              if (matrix[perm.resource]?.[act] !== undefined) {
+                matrix[perm.resource][act] = perm.scope as PermissionScope;
+              }
+            });
+          }
         }
       });
 
@@ -111,13 +141,24 @@ export const RolePermissionsEditor = ({ roleId }: { roleId: number }) => {
         )
       );
 
-      // Collect all new permissions to create
+      // Collect all new permissions to create — collapse identical scopes into wildcard action
       const permissionsToCreate: Array<{ role_id: number; resource: string; action: string; scope: string }> = [];
       for (const resource of RESOURCES) {
-        for (const action of ACTIONS) {
-          const scope = permissions[resource]?.[action];
-          if (scope && scope !== 'none') {
-            permissionsToCreate.push({ role_id: roleId, resource, action, scope });
+        // Check if all actions have the same non-none scope
+        const actionScopes = ACTIONS.map(action => permissions[resource]?.[action] || 'none');
+        const nonNoneScopes = actionScopes.filter(s => s !== 'none');
+        const allSameScope = nonNoneScopes.length === ACTIONS.length && new Set(nonNoneScopes).size === 1;
+        
+        if (allSameScope) {
+          // All actions have the same scope → use wildcard
+          permissionsToCreate.push({ role_id: roleId, resource, action: '*', scope: nonNoneScopes[0] });
+        } else {
+          // Individual actions
+          for (const action of ACTIONS) {
+            const scope = permissions[resource]?.[action];
+            if (scope && scope !== 'none') {
+              permissionsToCreate.push({ role_id: roleId, resource, action, scope });
+            }
           }
         }
       }

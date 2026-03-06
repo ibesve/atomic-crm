@@ -1,8 +1,6 @@
 import { RotateCcw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
-  useRecordContext,
-  useResourceContext,
   useTranslate,
 } from "ra-core";
 import { useRestoreWithUndoController } from "@react-admin/ra-core-ee";
@@ -10,7 +8,7 @@ import { useRestoreWithUndoController } from "@react-admin/ra-core-ee";
 export type RestoreButtonProps = {
   label?: string;
   size?: "default" | "sm" | "lg" | "icon";
-  resource?: string;
+  record?: any;
   className?: string;
   variant?:
     | "default"
@@ -31,14 +29,12 @@ export const RestoreButton = (props: RestoreButtonProps) => {
     size = "sm",
     variant = "outline",
     className = "",
+    record,
   } = props;
-  const record = useRecordContext(props);
-  const resource = useResourceContext(props);
   const translate = useTranslate();
 
   const { isPending, handleRestore } = useRestoreWithUndoController({
     record,
-    resource,
   });
 
   const label =

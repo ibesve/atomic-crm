@@ -16,7 +16,7 @@ export const Layout = ({ children }: { children: ReactNode }) => {
   return (
     <SidebarProvider>
       <AppSidebar />
-      <SidebarInset>
+      <SidebarInset className="min-w-0 overflow-hidden">
         <header className="flex h-12 shrink-0 items-center gap-2 border-b px-4">
           <SidebarTrigger className="-ml-1" />
           <Separator orientation="vertical" className="mr-2 h-4" />
@@ -25,7 +25,7 @@ export const Layout = ({ children }: { children: ReactNode }) => {
             <GlobalSearch />
           </div>
         </header>
-        <main className="flex-1 p-4" id="main-content">
+        <main className="flex-1 p-4 min-w-0 overflow-x-hidden" id="main-content">
           <ErrorBoundary FallbackComponent={Error}>
             <Suspense fallback={<Skeleton className="h-12 w-12 rounded-full" />}>
               {children}

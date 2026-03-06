@@ -88,6 +88,7 @@ import type {
   CustomFieldType,
 } from "../types/custom-objects";
 import { CustomObjectQuickView } from "./CustomObjectQuickView";
+import { useDynamicOptionsMap } from "@/hooks/useDynamicOptions";
 
 // Icon mapping for field types
 const FIELD_TYPE_ICON: Record<CustomFieldType, React.ElementType> = {
@@ -302,6 +303,13 @@ export const CustomObjectListPage = () => {
     return listFields.length > 0 ? listFields : fieldDefs.slice(0, 5);
   }, [fieldDefs]);
 
+  // Dynamic options for select/multiselect fields
+  const selectFields = useMemo(
+    () => (fieldDefs || []).filter((f) => f.field_type === "select" || f.field_type === "multiselect"),
+    [fieldDefs]
+  );
+  const { optionsMap: dynamicOptionsMap } = useDynamicOptionsMap(selectFields);
+
   // Filtered entries based on search
   const filteredEntries = useMemo(() => {
     if (!entries) return [];
@@ -478,14 +486,16 @@ export const CustomObjectListPage = () => {
       case "rating":
         return "★".repeat(Number(value) || 0);
       case "select": {
-        const opt = field.options?.find((o) => o.value === value);
+        const resolvedOpts = dynamicOptionsMap[field.id] || field.options || [];
+        const opt = resolvedOpts.find((o) => o.value === value);
         return opt?.label || String(value);
       }
       case "multiselect": {
+        const resolvedOpts = dynamicOptionsMap[field.id] || field.options || [];
         const vals = Array.isArray(value) ? value : [value];
         return vals
           .map((v) => {
-            const opt = field.options?.find((o) => o.value === v);
+            const opt = resolvedOpts.find((o) => o.value === v);
             return opt?.label || String(v);
           })
           .join(", ");
@@ -536,7 +546,7 @@ export const CustomObjectListPage = () => {
               <SelectValue placeholder={field.placeholder || "Auswählen..."} />
             </SelectTrigger>
             <SelectContent>
-              {field.options?.map((opt) => (
+              {(dynamicOptionsMap[field.id] || field.options || []).map((opt) => (
                 <SelectItem key={opt.value} value={opt.value}>
                   {opt.label}
                 </SelectItem>
@@ -547,7 +557,8 @@ export const CustomObjectListPage = () => {
           <div className="space-y-2">
             <div className="flex flex-wrap gap-1">
               {(Array.isArray(value) ? value : []).map((v: string) => {
-                const opt = field.options?.find((o) => o.value === v);
+                const resolvedOpts = dynamicOptionsMap[field.id] || field.options || [];
+                const opt = resolvedOpts.find((o) => o.value === v);
                 return (
                   <Badge key={v} variant="secondary" className="gap-1">
                     {opt?.label || v}
@@ -582,8 +593,8 @@ export const CustomObjectListPage = () => {
                 <SelectValue placeholder="Hinzufügen..." />
               </SelectTrigger>
               <SelectContent>
-                {field.options
-                  ?.filter((opt) => !(Array.isArray(value) ? value : []).includes(opt.value))
+                {(dynamicOptionsMap[field.id] || field.options || [])
+                  .filter((opt) => !(Array.isArray(value) ? value : []).includes(opt.value))
                   .map((opt) => (
                     <SelectItem key={opt.value} value={opt.value}>
                       {opt.label}

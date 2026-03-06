@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   useGetList,
   useCreate,
@@ -6,6 +6,7 @@ import {
   useNotify,
   useRefresh,
   useTranslate,
+  useGetIdentity,
 } from "ra-core";
 import {
   Plus,
@@ -29,6 +30,10 @@ import {
   DollarSign,
   Percent,
   Star,
+  Shield,
+  Database,
+  Eye,
+  Loader2,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -69,8 +74,10 @@ import type {
   CustomFieldType,
   CustomObjectDefinition,
   SelectOption,
+  OptionsSource,
 } from "../types/custom-objects";
 import { FIELD_TYPE_LABELS } from "../types/custom-objects";
+import { supabase } from "../providers/supabase/supabase";
 
 // Icons für Feldtypen
 const FIELD_TYPE_ICONS: Record<CustomFieldType, React.ElementType> = {
@@ -108,6 +115,10 @@ const DEFAULT_FORM_DATA: CustomFieldFormData = {
   show_in_detail: true,
   column_width: 150,
   field_group: "",
+  options_source: "static",
+  source_table: "",
+  source_value_column: "id",
+  source_label_column: "name",
 };
 
 interface CustomFieldsManagerProps {
@@ -124,6 +135,7 @@ export function CustomFieldsManager({
   const notify = useNotify();
   const refresh = useRefresh();
   const translate = useTranslate();
+  const { data: identity } = useGetIdentity();
 
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [editingField, setEditingField] =
@@ -133,6 +145,17 @@ export function CustomFieldsManager({
   const [formData, setFormData] =
     useState<CustomFieldFormData>(DEFAULT_FORM_DATA);
   const [newOption, setNewOption] = useState("");
+
+  // Dynamic options source: available tables and columns for live preview
+  const [availableTables, setAvailableTables] = useState<{ table_name: string; table_type: string }[]>([]);
+  const [availableColumns, setAvailableColumns] = useState<{ column_name: string; data_type: string }[]>([]);
+  const [previewOptions, setPreviewOptions] = useState<SelectOption[]>([]);
+  const [previewLoading, setPreviewLoading] = useState(false);
+
+  // Custom Object source: preview data and available data fields
+  const [coPreviewOptions, setCoPreviewOptions] = useState<SelectOption[]>([]);
+  const [coPreviewLoading, setCoPreviewLoading] = useState(false);
+  const [coPreviewFields, setCoPreviewFields] = useState<string[]>([]);
 
   // Load custom object definitions for reference field type
   const { data: allCustomObjects } = useGetList<CustomObjectDefinition>(
@@ -164,6 +187,177 @@ export function CustomFieldsManager({
 
   const [create] = useCreate();
   const [update] = useUpdate();
+
+  // Load available tables for dynamic options source picker
+  useEffect(() => {
+    const loadTables = async () => {
+      try {
+        const { data, error } = await supabase.rpc("get_available_tables");
+        if (!error && data) {
+          setAvailableTables(data);
+        }
+      } catch {
+        // RPC not yet available (migration not applied yet)
+      }
+    };
+    loadTables();
+  }, []);
+
+  // Load columns when source_table changes (skip for custom_object markers)
+  useEffect(() => {
+    const loadColumns = async () => {
+      if (!formData.source_table || formData.source_table.startsWith("__custom_object__")) {
+        setAvailableColumns([]);
+        setPreviewOptions([]);
+        return;
+      }
+      try {
+        const { data, error } = await supabase.rpc("get_table_columns", {
+          p_table_name: formData.source_table,
+        });
+        if (!error && data) {
+          setAvailableColumns(data);
+        }
+      } catch {
+        setAvailableColumns([]);
+      }
+    };
+    loadColumns();
+  }, [formData.source_table]);
+
+  // Live preview: load sample options from the selected table
+  useEffect(() => {
+    const loadPreview = async () => {
+      if (
+        formData.options_source !== "table" &&
+        formData.options_source !== "view"
+      ) {
+        setPreviewOptions([]);
+        return;
+      }
+      if (!formData.source_table) {
+        setPreviewOptions([]);
+        return;
+      }
+
+      setPreviewLoading(true);
+      try {
+        const valueCol = formData.source_value_column || "id";
+        const labelCol = formData.source_label_column || "name";
+        const { data, error } = await supabase
+          .from(formData.source_table)
+          .select(`${valueCol}, ${labelCol}`)
+          .limit(20);
+
+        if (!error && data) {
+          setPreviewOptions(
+            data.map((row: Record<string, unknown>) => ({
+              value: String(row[valueCol] ?? ""),
+              label: String(row[labelCol] ?? row[valueCol] ?? ""),
+            }))
+          );
+        } else {
+          setPreviewOptions([]);
+        }
+      } catch {
+        setPreviewOptions([]);
+      } finally {
+        setPreviewLoading(false);
+      }
+    };
+    loadPreview();
+  }, [
+    formData.options_source,
+    formData.source_table,
+    formData.source_value_column,
+    formData.source_label_column,
+  ]);
+
+  // Custom Object preview: load entries from custom_object_data for the selected object
+  useEffect(() => {
+    const loadCoPreview = async () => {
+      if (formData.options_source !== "custom_object" || !formData.source_table) {
+        setCoPreviewOptions([]);
+        setCoPreviewFields([]);
+        return;
+      }
+
+      // Extract object definition ID from marker: __custom_object__<id>
+      const match = formData.source_table.match(/^__custom_object__(\d+)$/);
+      if (!match) {
+        setCoPreviewOptions([]);
+        setCoPreviewFields([]);
+        return;
+      }
+      const objDefId = Number(match[1]);
+
+      setCoPreviewLoading(true);
+      try {
+        const { data, error } = await supabase
+          .from("custom_object_data")
+          .select("id, data")
+          .eq("object_definition_id", objDefId)
+          .is("deleted_at", null)
+          .limit(20);
+
+        if (!error && data && data.length > 0) {
+          // Extract available data sub-fields from first record
+          const firstData = data[0]?.data;
+          if (firstData && typeof firstData === "object") {
+            setCoPreviewFields(Object.keys(firstData as Record<string, unknown>));
+          } else {
+            setCoPreviewFields([]);
+          }
+
+          const labelCol = formData.source_label_column || "name";
+          setCoPreviewOptions(
+            data.map((row: Record<string, unknown>) => {
+              const rowData = row.data as Record<string, unknown> | null;
+              let label: string;
+              if (labelCol.startsWith("data.")) {
+                const dataKey = labelCol.replace("data.", "");
+                label = String(rowData?.[dataKey] ?? row.id);
+              } else if (rowData && labelCol in rowData) {
+                // labelCol is a key inside the JSONB data column (e.g. "name")
+                label = String(rowData[labelCol] ?? row.id);
+              } else {
+                // Fallback to top-level column or id
+                label = String(row[labelCol] ?? row.id);
+              }
+              return {
+                value: String(row.id ?? ""),
+                label,
+              };
+            })
+          );
+        } else {
+          setCoPreviewOptions([]);
+          setCoPreviewFields([]);
+        }
+      } catch {
+        setCoPreviewOptions([]);
+        setCoPreviewFields([]);
+      } finally {
+        setCoPreviewLoading(false);
+      }
+    };
+    loadCoPreview();
+  }, [formData.options_source, formData.source_table, formData.source_label_column]);
+
+  // Admin-only access guard (after all hooks)
+  if (identity && !identity?.administrator) {
+    return (
+      <div className="p-8 text-center">
+        <Shield className="w-16 h-16 mx-auto text-muted-foreground mb-4" />
+        <h2 className="text-xl font-semibold mb-2">
+          {translate("crm.admin.access_denied", { _: "Zugriff verweigert" })}
+        </h2>
+        <p className="text-muted-foreground">
+          {translate("crm.admin.admin_required", { _: "Die Verwaltung von benutzerdefinierten Feldern ist nur für Administratoren zugänglich." })}
+        </p>
+      </div>
+    );
+  }
 
   // Technischen Namen aus Label generieren
   const generateName = (label: string) => {
@@ -232,6 +426,20 @@ export function CustomFieldsManager({
     if (!data.field_group) data.field_group = null;
     if (!data.description) data.description = null;
 
+    // Dynamic source fields cleanup
+    if (data.options_source === 'static' || !data.options_source) {
+      data.options_source = 'static';
+      data.source_table = null;
+      data.source_value_column = null;
+      data.source_label_column = null;
+      data.source_filter = null;
+    } else {
+      if (!data.source_table) data.source_table = null;
+      if (!data.source_value_column) data.source_value_column = 'id';
+      if (!data.source_label_column) data.source_label_column = 'name';
+      data.options = null; // Dynamic source overrides static options
+    }
+
     try {
       await create("custom_field_definitions", { data }, { returnPromise: true });
       notify(translate("crm.custom_fields.created"), { type: "success" });
@@ -260,6 +468,20 @@ export function CustomFieldsManager({
     if (!data.help_text) data.help_text = null;
     if (!data.field_group) data.field_group = null;
     if (!data.description) data.description = null;
+
+    // Dynamic source fields cleanup
+    if (data.options_source === 'static' || !data.options_source) {
+      data.options_source = 'static';
+      data.source_table = null;
+      data.source_value_column = null;
+      data.source_label_column = null;
+      data.source_filter = null;
+    } else {
+      if (!data.source_table) data.source_table = null;
+      if (!data.source_value_column) data.source_value_column = 'id';
+      if (!data.source_label_column) data.source_label_column = 'name';
+      data.options = null;
+    }
 
     try {
       await update("custom_field_definitions", {
@@ -312,6 +534,10 @@ export function CustomFieldsManager({
       show_in_detail: field.show_in_detail,
       column_width: field.column_width || 150,
       field_group: field.field_group || "",
+      options_source: field.options_source || "static",
+      source_table: field.source_table || "",
+      source_value_column: field.source_value_column || "id",
+      source_label_column: field.source_label_column || "name",
     });
     setEditingField(field);
   };
@@ -533,57 +759,392 @@ export function CustomFieldsManager({
                 <Label className="text-sm font-semibold">
                   {translate("crm.custom_fields.select_options")} *
                 </Label>
-                <p className="text-xs text-muted-foreground">
-                  {formData.field_type === "multiselect"
-                    ? "Geben Sie die Optionen ein, aus denen Benutzer mehrere auswählen können."
-                    : "Geben Sie die Optionen ein, aus denen Benutzer eine auswählen können."}
-                </p>
-                <div className="flex gap-2">
-                  <Input
-                    value={newOption}
-                    onChange={(e) => setNewOption(e.target.value)}
-                    placeholder={translate("crm.custom_fields.new_option", { _: "Neue Option eingeben…" })}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") {
-                        e.preventDefault();
-                        handleAddOption();
-                      }
-                    }}
-                  />
-                  <Button
+
+                {/* Source Type Toggle */}
+                <div className="flex gap-1 p-1 rounded-md bg-muted">
+                  <button
                     type="button"
-                    variant="secondary"
-                    onClick={handleAddOption}
-                    disabled={!newOption.trim()}
+                    className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 rounded text-xs font-medium transition-colors ${
+                      (!formData.options_source || formData.options_source === "static")
+                        ? "bg-background shadow-sm text-foreground"
+                        : "text-muted-foreground hover:text-foreground"
+                    }`}
+                    onClick={() =>
+                      setFormData((prev) => ({ ...prev, options_source: "static" }))
+                    }
                   >
-                    <Plus className="w-4 h-4 mr-1" />
-                    Hinzufügen
-                  </Button>
+                    <List className="w-3.5 h-3.5" />
+                    Statisch
+                  </button>
+                  <button
+                    type="button"
+                    className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 rounded text-xs font-medium transition-colors ${
+                      formData.options_source === "table" || formData.options_source === "view"
+                        ? "bg-background shadow-sm text-foreground"
+                        : "text-muted-foreground hover:text-foreground"
+                    }`}
+                    onClick={() =>
+                      setFormData((prev) => ({ ...prev, options_source: "table" }))
+                    }
+                  >
+                    <Database className="w-3.5 h-3.5" />
+                    Tabelle / View
+                  </button>
+                  <button
+                    type="button"
+                    className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 rounded text-xs font-medium transition-colors ${
+                      formData.options_source === "custom_object"
+                        ? "bg-background shadow-sm text-foreground"
+                        : "text-muted-foreground hover:text-foreground"
+                    }`}
+                    onClick={() =>
+                      setFormData((prev) => ({ ...prev, options_source: "custom_object" as OptionsSource }))
+                    }
+                  >
+                    <Link className="w-3.5 h-3.5" />
+                    Custom Object
+                  </button>
                 </div>
-                {formData.options && formData.options.length > 0 ? (
-                  <div className="space-y-1">
-                    {formData.options.map((opt, idx) => (
-                      <div
-                        key={idx}
-                        className="flex items-center justify-between px-2 py-1.5 rounded border bg-background text-sm"
+
+                {/* Static Options */}
+                {(!formData.options_source || formData.options_source === "static") && (
+                  <div className="space-y-3">
+                    <p className="text-xs text-muted-foreground">
+                      {formData.field_type === "multiselect"
+                        ? "Geben Sie die Optionen ein, aus denen Benutzer mehrere auswählen können."
+                        : "Geben Sie die Optionen ein, aus denen Benutzer eine auswählen können."}
+                    </p>
+                    <div className="flex gap-2">
+                      <Input
+                        value={newOption}
+                        onChange={(e) => setNewOption(e.target.value)}
+                        placeholder={translate("crm.custom_fields.new_option", { _: "Neue Option eingeben…" })}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") {
+                            e.preventDefault();
+                            handleAddOption();
+                          }
+                        }}
+                      />
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        onClick={handleAddOption}
+                        disabled={!newOption.trim()}
                       >
-                        <span>{opt.label}</span>
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="icon"
-                          className="h-6 w-6 text-muted-foreground hover:text-destructive"
-                          onClick={() => handleRemoveOption(idx)}
-                        >
-                          <X className="w-3.5 h-3.5" />
-                        </Button>
+                        <Plus className="w-4 h-4 mr-1" />
+                        Hinzufügen
+                      </Button>
+                    </div>
+                    {formData.options && formData.options.length > 0 ? (
+                      <div className="space-y-1">
+                        {formData.options.map((opt, idx) => (
+                          <div
+                            key={idx}
+                            className="flex items-center justify-between px-2 py-1.5 rounded border bg-background text-sm"
+                          >
+                            <span>{opt.label}</span>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              className="h-6 w-6 text-muted-foreground hover:text-destructive"
+                              onClick={() => handleRemoveOption(idx)}
+                            >
+                              <X className="w-3.5 h-3.5" />
+                            </Button>
+                          </div>
+                        ))}
                       </div>
-                    ))}
+                    ) : (
+                      <p className="text-xs text-amber-600 dark:text-amber-400">
+                        Noch keine Optionen hinzugefügt. Geben Sie mindestens eine Option ein.
+                      </p>
+                    )}
                   </div>
-                ) : (
-                  <p className="text-xs text-amber-600 dark:text-amber-400">
-                    Noch keine Optionen hinzugefügt. Geben Sie mindestens eine Option ein.
-                  </p>
+                )}
+
+                {/* Dynamic Options Source */}
+                {(formData.options_source === "table" || formData.options_source === "view") && (
+                  <div className="space-y-3">
+                    <p className="text-xs text-muted-foreground">
+                      Wählen Sie eine Tabelle/View als Datenquelle. Die Optionen werden dynamisch aus der Datenbank geladen.
+                    </p>
+
+                    {/* Source Table */}
+                    <div className="space-y-1.5">
+                      <Label className="text-xs">Quelle (Tabelle/View)</Label>
+                      <Select
+                        value={formData.source_table || undefined}
+                        onValueChange={(v) =>
+                          setFormData((prev) => ({ ...prev, source_table: v }))
+                        }
+                      >
+                        <SelectTrigger className="h-8 text-xs">
+                          <SelectValue placeholder="Tabelle auswählen…" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {availableTables.length > 0 ? (
+                            <>
+                              {availableTables.filter(t => t.table_type === "BASE TABLE").length > 0 && (
+                                <>
+                                  <div className="px-2 py-1 text-xs text-muted-foreground font-medium">Tabellen</div>
+                                  {availableTables
+                                    .filter(t => t.table_type === "BASE TABLE")
+                                    .map((t) => (
+                                      <SelectItem key={t.table_name} value={t.table_name}>
+                                        {t.table_name}
+                                      </SelectItem>
+                                    ))}
+                                </>
+                              )}
+                              {availableTables.filter(t => t.table_type === "VIEW").length > 0 && (
+                                <>
+                                  <div className="border-t my-1" />
+                                  <div className="px-2 py-1 text-xs text-muted-foreground font-medium">Views</div>
+                                  {availableTables
+                                    .filter(t => t.table_type === "VIEW")
+                                    .map((t) => (
+                                      <SelectItem key={t.table_name} value={t.table_name}>
+                                        {t.table_name}
+                                      </SelectItem>
+                                    ))}
+                                </>
+                              )}
+                            </>
+                          ) : (
+                            <div className="px-2 py-1 text-xs text-muted-foreground">
+                              Keine Tabellen verfügbar
+                            </div>
+                          )}
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    {/* Value and Label columns */}
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="space-y-1.5">
+                        <Label className="text-xs">Wert-Spalte</Label>
+                        <Select
+                          value={formData.source_value_column || "id"}
+                          onValueChange={(v) =>
+                            setFormData((prev) => ({ ...prev, source_value_column: v }))
+                          }
+                        >
+                          <SelectTrigger className="h-8 text-xs">
+                            <SelectValue placeholder="id" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {availableColumns.length > 0 ? (
+                              availableColumns.map((col) => (
+                                <SelectItem key={col.column_name} value={col.column_name}>
+                                  <span className="font-mono">{col.column_name}</span>
+                                  <span className="text-muted-foreground ml-1 text-[10px]">({col.data_type})</span>
+                                </SelectItem>
+                              ))
+                            ) : (
+                              <div className="px-2 py-1 text-xs text-muted-foreground">
+                                {formData.source_table ? "Lade Spalten…" : "Zuerst Tabelle auswählen"}
+                              </div>
+                            )}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="space-y-1.5">
+                        <Label className="text-xs">Anzeige-Spalte</Label>
+                        <Select
+                          value={formData.source_label_column || "name"}
+                          onValueChange={(v) =>
+                            setFormData((prev) => ({ ...prev, source_label_column: v }))
+                          }
+                        >
+                          <SelectTrigger className="h-8 text-xs">
+                            <SelectValue placeholder="name" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {availableColumns.length > 0 ? (
+                              availableColumns.map((col) => (
+                                <SelectItem key={col.column_name} value={col.column_name}>
+                                  <span className="font-mono">{col.column_name}</span>
+                                  <span className="text-muted-foreground ml-1 text-[10px]">({col.data_type})</span>
+                                </SelectItem>
+                              ))
+                            ) : (
+                              <div className="px-2 py-1 text-xs text-muted-foreground">
+                                {formData.source_table ? "Lade Spalten…" : "Zuerst Tabelle auswählen"}
+                              </div>
+                            )}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+
+                    {/* Display Template */}
+                    <div className="space-y-1.5">
+                      <Label className="text-xs">Anzeige-Template (optional)</Label>
+                      <Input
+                        className="h-8 text-xs"
+                        value={formData.reference_display_field}
+                        onChange={(e) =>
+                          setFormData((prev) => ({
+                            ...prev,
+                            reference_display_field: e.target.value,
+                          }))
+                        }
+                        placeholder={`z.B. {${formData.source_label_column || 'name'}} ({${formData.source_value_column || 'id'}})`}
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        Template mit Platzhaltern: <code>{`{spaltenname}`}</code>. Leer = nur Anzeige-Spalte.
+                      </p>
+                    </div>
+
+                    {/* Live Preview */}
+                    {formData.source_table && (
+                      <div className="space-y-1.5">
+                        <Label className="text-xs flex items-center gap-1.5">
+                          <Eye className="w-3.5 h-3.5" />
+                          Vorschau (max. 20 Einträge)
+                        </Label>
+                        <div className="rounded border bg-background p-2 max-h-36 overflow-y-auto">
+                          {previewLoading ? (
+                            <div className="flex items-center gap-2 text-xs text-muted-foreground py-2 justify-center">
+                              <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                              Lade Vorschau…
+                            </div>
+                          ) : previewOptions.length > 0 ? (
+                            <div className="flex flex-wrap gap-1">
+                              {previewOptions.map((opt, idx) => (
+                                <Badge key={idx} variant="secondary" className="text-xs">
+                                  {opt.label}
+                                </Badge>
+                              ))}
+                            </div>
+                          ) : (
+                            <p className="text-xs text-muted-foreground text-center py-2">
+                              Keine Daten gefunden. Prüfen Sie Tabelle und Spalten.
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Custom Object Source */}
+                {formData.options_source === "custom_object" && (
+                  <div className="space-y-3">
+                    <p className="text-xs text-muted-foreground">
+                      Wählen Sie ein Custom Object als Datenquelle. Die Optionen werden aus den Einträgen dieses Objekts geladen.
+                    </p>
+
+                    {/* Custom Object Selection */}
+                    <div className="space-y-1.5">
+                      <Label className="text-xs">Custom Object</Label>
+                      <Select
+                        value={formData.source_table || undefined}
+                        onValueChange={(v) =>
+                          setFormData((prev) => ({
+                            ...prev,
+                            source_table: v,
+                            source_value_column: "id",
+                            source_label_column: "name",
+                          }))
+                        }
+                      >
+                        <SelectTrigger className="h-8 text-xs">
+                          <SelectValue placeholder="Custom Object auswählen…" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {allCustomObjects && allCustomObjects.length > 0 ? (
+                            allCustomObjects.map((obj) => (
+                              <SelectItem key={obj.id} value={`__custom_object__${obj.id}`}>
+                                {obj.label || obj.name}
+                              </SelectItem>
+                            ))
+                          ) : (
+                            <div className="px-2 py-1 text-xs text-muted-foreground">
+                              Keine Custom Objects vorhanden
+                            </div>
+                          )}
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    {/* Display field for custom objects */}
+                    <div className="space-y-1.5">
+                      <Label className="text-xs">Anzeige-Feld</Label>
+                      <Select
+                        value={formData.source_label_column || "name"}
+                        onValueChange={(v) =>
+                          setFormData((prev) => ({ ...prev, source_label_column: v }))
+                        }
+                      >
+                        <SelectTrigger className="h-8 text-xs">
+                          <SelectValue placeholder="name" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="name">
+                            <span className="font-mono">name</span>
+                            <span className="text-muted-foreground ml-1 text-[10px]">(Standard)</span>
+                          </SelectItem>
+                          {coPreviewFields.map((field) => (
+                            <SelectItem key={field} value={`data.${field}`}>
+                              <span className="font-mono">data.{field}</span>
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    {/* Display Template for custom objects */}
+                    <div className="space-y-1.5">
+                      <Label className="text-xs">Anzeige-Template (optional)</Label>
+                      <Input
+                        className="h-8 text-xs"
+                        value={formData.reference_display_field}
+                        onChange={(e) =>
+                          setFormData((prev) => ({
+                            ...prev,
+                            reference_display_field: e.target.value,
+                          }))
+                        }
+                        placeholder="z.B. {name} - {data.stadt}"
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        Template mit Platzhaltern: <code>{`{spaltenname}`}</code> oder <code>{`{data.feldname}`}</code>. Leer = nur Anzeige-Feld.
+                      </p>
+                    </div>
+
+                    {/* Live Preview */}
+                    {formData.source_table && (
+                      <div className="space-y-1.5">
+                        <Label className="text-xs flex items-center gap-1.5">
+                          <Eye className="w-3.5 h-3.5" />
+                          Vorschau (max. 20 Einträge)
+                        </Label>
+                        <div className="rounded border bg-background p-2 max-h-36 overflow-y-auto">
+                          {coPreviewLoading ? (
+                            <div className="flex items-center gap-2 text-xs text-muted-foreground py-2 justify-center">
+                              <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                              Lade Vorschau…
+                            </div>
+                          ) : coPreviewOptions.length > 0 ? (
+                            <div className="flex flex-wrap gap-1">
+                              {coPreviewOptions.map((opt, idx) => (
+                                <Badge key={idx} variant="secondary" className="text-xs">
+                                  {opt.label}
+                                </Badge>
+                              ))}
+                            </div>
+                          ) : (
+                            <p className="text-xs text-muted-foreground text-center py-2">
+                              Keine Einträge gefunden.
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </div>
                 )}
               </div>
             )}
@@ -638,10 +1199,10 @@ export function CustomFieldsManager({
                         reference_display_field: e.target.value,
                       }))
                     }
-                    placeholder="z.B. name, title, label"
+                    placeholder="z.B. name oder {first_name}, {last_name}"
                   />
                   <p className="text-xs text-muted-foreground">
-                    Der Feldname, der im Dropdown als Anzeige verwendet wird (Standard: name).
+                    Feldname oder Template mit Platzhaltern: <code>{"{first_name} {last_name}"}</code>. Standard: name.
                   </p>
                 </div>
                 {formData.reference_object && (

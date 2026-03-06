@@ -8,6 +8,7 @@ import {
   useTranslate,
 } from "ra-core";
 import type { RaRecord } from "ra-core";
+import { useTransitiveReferences } from "@/hooks/useTransitiveReferences";
 import { Switch } from "@/components/ui/switch";
 import {
   Select,
@@ -17,6 +18,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import type { CustomFieldDefinition, CustomObjectDefinition } from "../types/custom-objects";
+import { useDynamicOptionsMap } from "@/hooks/useDynamicOptions";
 
 interface CustomFieldsDisplayProps {
   entityType: "contacts" | "companies" | "deals";
@@ -129,6 +131,20 @@ export const CustomFieldsDisplay = ({
     if (customRefTarget && refCustomData) map[customRefTarget] = refCustomData;
     return map;
   }, [refContacts, refCompanies, refDeals, refSales, customRefTarget, refCustomData]);
+
+  // Dynamic options for select/multiselect fields
+  const selectFields = useMemo(
+    () => (fieldDefs || []).filter((f) => f.field_type === "select" || f.field_type === "multiselect"),
+    [fieldDefs]
+  );
+  const { optionsMap: dynamicOptionsMap } = useDynamicOptionsMap(selectFields);
+
+  // ── Transitive references (A→B→C) ────────────────────────
+  const refFieldDefs = useMemo(
+    () => (fieldDefs || []).filter((f) => f.field_type === "reference" && f.reference_object),
+    [fieldDefs],
+  );
+  const { getEnrichedLabel } = useTransitiveReferences(refFieldDefs, refDataMap);
 
   const getRefLabel = (target: string, r: RaRecord, displayField?: string | null): string => {
     if (target === "contacts" || target === "sales")
@@ -278,14 +294,16 @@ export const CustomFieldsDisplay = ({
     if (fieldDef.field_type === "rating")
       return "★".repeat(Number(val) || 0);
     if (fieldDef.field_type === "select") {
-      const opt = fieldDef.options?.find((o) => o.value === val);
+      const resolvedOpts = dynamicOptionsMap[fieldDef.id] || fieldDef.options || [];
+      const opt = resolvedOpts.find((o) => o.value === val);
       return opt?.label || String(val);
     }
     if (fieldDef.field_type === "multiselect") {
+      const resolvedOpts = dynamicOptionsMap[fieldDef.id] || fieldDef.options || [];
       const vals = Array.isArray(val) ? val : [val];
       return vals
         .map((v) => {
-          const opt = fieldDef.options?.find((o) => o.value === v);
+          const opt = resolvedOpts.find((o) => o.value === v);
           return opt?.label || String(v);
         })
         .join(", ");
@@ -329,10 +347,13 @@ export const CustomFieldsDisplay = ({
           const target = fieldDef.reference_object;
           const displayField = fieldDef.reference_display_field;
           const refRecords = refDataMap[target] || [];
-          const choices = refRecords.map((r) => ({
-            value: String(r.id),
-            label: getRefLabel(target, r, displayField),
-          }));
+          const choices = refRecords.map((r) => {
+            const baseLabel = getRefLabel(target, r, displayField);
+            return {
+              value: String(r.id),
+              label: getEnrichedLabel(fieldDef.id, r.id, baseLabel),
+            };
+          });
           const currentLabel = val
             ? (choices.find((c) => c.value === String(val))?.label || String(val))
             : "–";

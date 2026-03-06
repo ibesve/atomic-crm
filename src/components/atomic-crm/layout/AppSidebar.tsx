@@ -337,18 +337,7 @@ export const AppSidebar = () => {
                   </Link>
                 </SidebarMenuButton>
               </SidebarMenuItem>
-              <SidebarMenuItem>
-                <SidebarMenuButton
-                  asChild
-                  isActive={isActive("/admin/settings") && false}
-                  tooltip={translate("crm.rbac.quick_edit", { _: "RBAC bearbeiten" })}
-                >
-                  <Link to="/admin/settings?tab=roles">
-                    <Shield />
-                    <span>{translate("crm.rbac.quick_edit", { _: "RBAC bearbeiten" })}</span>
-                  </Link>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
+
             </>
           )}
 

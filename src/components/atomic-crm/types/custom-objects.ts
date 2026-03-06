@@ -32,6 +32,8 @@ export interface ValidationRules {
   pattern_message?: string;
 }
 
+export type OptionsSource = 'static' | 'table' | 'view' | 'custom_object';
+
 export interface CustomFieldDefinition {
   id: number;
   created_at: string;
@@ -57,6 +59,12 @@ export interface CustomFieldDefinition {
   sort_order: number;
   field_group: string | null;
   deleted_at: string | null;
+  // Dynamic options source fields
+  options_source: OptionsSource;
+  source_table: string | null;
+  source_value_column: string | null;
+  source_label_column: string | null;
+  source_filter: Record<string, unknown> | null;
 }
 
 export interface CustomObjectDefinition {
@@ -155,6 +163,51 @@ export interface CustomFieldFormData {
   show_in_detail?: boolean;
   column_width?: number;
   field_group?: string;
+  // Dynamic options source
+  options_source?: OptionsSource;
+  source_table?: string;
+  source_value_column?: string;
+  source_label_column?: string;
+  source_filter?: Record<string, unknown>;
+}
+
+// Saved Views
+export interface SavedViewFilter {
+  field: string;
+  operator: 'eq' | 'neq' | 'gt' | 'gte' | 'lt' | 'lte' | 'like' | 'ilike' | 'is' | 'not.is' | 'in' | 'cs' | 'cd';
+  value: unknown;
+}
+
+export interface SavedViewFilters {
+  logic: 'and' | 'or';
+  rules: SavedViewFilter[];
+}
+
+export interface SavedViewSort {
+  field: string;
+  order: 'ASC' | 'DESC';
+}
+
+export interface SavedViewColumn {
+  source: string;
+  width?: number;
+  hidden?: boolean;
+}
+
+export interface SavedView {
+  id: number;
+  created_at: string;
+  updated_at: string;
+  created_by: number | null;
+  resource: string;
+  name: string;
+  description: string | null;
+  filters: SavedViewFilters;
+  sort: SavedViewSort | null;
+  columns: SavedViewColumn[] | null;
+  is_default: boolean;
+  is_shared: boolean;
+  deleted_at: string | null;
 }
 
 // Icon-Mapping für Lucide

@@ -5,6 +5,7 @@ import { BooleanInput } from "@/components/admin/boolean-input";
 import { DateInput } from "@/components/admin/date-input";
 import { ReferenceInput } from "@/components/admin/reference-input";
 import type { CustomFieldDefinition, CustomObjectDefinition } from "../types/custom-objects";
+import { useDynamicOptions } from "@/hooks/useDynamicOptions";
 
 interface CustomFieldsSectionProps {
   entityType: "contacts" | "companies" | "deals";
@@ -69,6 +70,9 @@ export const CustomFieldsSection = ({
 
 const CustomFieldInput = ({ field }: { field: CustomFieldDefinition }) => {
   const source = `_cf_${field.name}`;
+  const { options: resolvedOptions } = useDynamicOptions(
+    field.field_type === "select" || field.field_type === "multiselect" ? field : null
+  );
 
   switch (field.field_type) {
     case "text":
@@ -131,7 +135,7 @@ const CustomFieldInput = ({ field }: { field: CustomFieldDefinition }) => {
           label={field.label}
           helperText={field.help_text || false}
           choices={
-            field.options?.map((o) => ({ id: o.value, name: o.label })) || []
+            resolvedOptions.map((o) => ({ id: o.value, name: o.label }))
           }
         />
       );
@@ -142,7 +146,7 @@ const CustomFieldInput = ({ field }: { field: CustomFieldDefinition }) => {
           label={field.label}
           helperText={field.help_text || false}
           choices={
-            field.options?.map((o) => ({ id: o.value, name: o.label })) || []
+            resolvedOptions.map((o) => ({ id: o.value, name: o.label }))
           }
         />
       );

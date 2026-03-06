@@ -3,6 +3,7 @@ import {
   useGetList,
   useNotify,
   useTranslate,
+  useDataProvider,
   RecordContextProvider,
   RaRecord,
 } from "ra-core";
@@ -55,7 +56,7 @@ export interface EditableColumnDef<RecordType extends RaRecord = RaRecord> {
   source: string;
   label: string;
   editable?: boolean;
-  type?: "text" | "number" | "select" | "reference" | "boolean";
+  type?: "text" | "number" | "select" | "reference" | "boolean" | "date" | "datetime";
   options?: { value: string; label: string }[];
   referenceResource?: string;
   referenceData?: RaRecord[]; // NEU: Referenzdaten können direkt übergeben werden
@@ -90,6 +91,14 @@ interface EditableDataGridProps<RecordType extends RaRecord = RaRecord> {
   storeKey?: string;
   enableSoftDelete?: boolean;
   onRowClick?: (record: RecordType) => void;
+  /** External filter object merged into the data query (e.g. from AdvancedFilterBuilder) */
+  externalFilter?: Record<string, unknown>;
+  /** Client-side filter predicate for custom-field values that can't be sent to PostgREST */
+  clientSideFilter?: ((record: Record<string, unknown>) => boolean) | null;
+  /** Callback fired when the set of selected row IDs changes */
+  onSelectionChange?: (selectedIds: (string | number)[]) => void;
+  /** Callback fired when hidden columns change (user toggles column visibility) */
+  onHiddenColumnsChange?: (hiddenColumns: string[]) => void;
 }
 
 export function EditableDataGrid<RecordType extends RaRecord = RaRecord>({
@@ -102,6 +111,10 @@ export function EditableDataGrid<RecordType extends RaRecord = RaRecord>({
   storeKey,
   enableSoftDelete = true,
   onRowClick,
+  externalFilter,
+  clientSideFilter,
+  onSelectionChange,
+  onHiddenColumnsChange,
 }: EditableDataGridProps<RecordType>) {
   const translate = useTranslate();
   const notify = useNotify();
@@ -114,10 +127,14 @@ export function EditableDataGrid<RecordType extends RaRecord = RaRecord>({
       const saved = localStorage.getItem(storageKey);
       if (saved) {
         const parsed = JSON.parse(saved);
+        // Validate persisted sort field against current columns to prevent
+        // 400 errors when the view doesn't have the persisted sort column
+        const validSources = new Set(columns.map(c => c.source));
+        const sortIsValid = parsed.sort?.field && validSources.has(parsed.sort.field);
         return {
           columnOrder: parsed.columnOrder || columns.map(c => c.source),
           hiddenColumns: parsed.hiddenColumns || columns.filter(c => c.defaultHidden).map(c => c.source),
-          sort: parsed.sort || defaultSort,
+          sort: sortIsValid ? parsed.sort : defaultSort,
           showDeleted: parsed.showDeleted || false,
           columnWidths: parsed.columnWidths || {},
         };
@@ -157,7 +174,20 @@ export function EditableDataGrid<RecordType extends RaRecord = RaRecord>({
   }, [columns, state.columnOrder]);
 
   const [filters, setFilters] = useState<Record<string, string>>({});
-  const [selectedIds, setSelectedIds] = useState<(string | number)[]>([]);
+  const [selectedIds, _setSelectedIds] = useState<(string | number)[]>([]);
+  const setSelectedIds = useCallback((update: (string | number)[] | ((prev: (string | number)[]) => (string | number)[])) => {
+    _setSelectedIds((prev) => {
+      const next = typeof update === 'function' ? update(prev) : update;
+      onSelectionChange?.(next);
+      return next;
+    });
+  }, [onSelectionChange]);
+
+  // Notify parent when hidden columns change
+  useEffect(() => {
+    onHiddenColumnsChange?.(state.hiddenColumns);
+  }, [state.hiddenColumns, onHiddenColumnsChange]);
+
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [recordToDelete, setRecordToDelete] = useState<RecordType | null>(null);
   const [draggedColumn, setDraggedColumn] = useState<string | null>(null);
@@ -185,19 +215,29 @@ export function EditableDataGrid<RecordType extends RaRecord = RaRecord>({
       Object.entries(filters).filter(([_, v]) => v !== "")
     );
     
+    // Merge external filter (from AdvancedFilterBuilder)
+    const merged = { ...baseFilter, ...(externalFilter || {}) };
+    
     // Wenn showDeleted false ist, nur nicht-gelöschte anzeigen
     if (enableSoftDelete && !state.showDeleted) {
-      return { ...baseFilter, "deleted_at@is": "null" };
+      return { ...merged, "deleted_at@is": "null" };
     }
     
-    return baseFilter;
-  }, [filters, state.showDeleted, enableSoftDelete]);
+    return merged;
+  }, [filters, state.showDeleted, enableSoftDelete, externalFilter]);
 
-  const { data, total, isPending } = useGetList<RecordType>(resource, {
+  const { data: rawData, total: rawTotal, isPending } = useGetList<RecordType>(resource, {
     pagination: { page: 1, perPage: 100 },
     sort: state.sort,
     filter: buildFilter(),
   });
+
+  // Apply client-side filter (for custom-field values that can't be queried via PostgREST)
+  const data = useMemo(() => {
+    if (!rawData || !clientSideFilter) return rawData;
+    return rawData.filter((r) => clientSideFilter(r as Record<string, unknown>));
+  }, [rawData, clientSideFilter]);
+  const total = clientSideFilter ? (data?.length ?? 0) : rawTotal;
 
   // Count deleted items (only when soft delete is enabled)
   const { total: deletedCount } = useGetList<RecordType>(resource, {
@@ -347,16 +387,19 @@ export function EditableDataGrid<RecordType extends RaRecord = RaRecord>({
     );
   }, []);
 
-  // Delete handler - uses soft delete
+  // Delete handler - soft delete when enabled, hard delete otherwise
+  const dataProvider = useDataProvider();
   const handleDelete = useCallback(
     async (record: RecordType) => {
       if (enableSoftDelete) {
         await softDelete(record.id);
+      } else {
+        await dataProvider.delete(resource, { id: record.id, previousData: record });
       }
       setDeleteDialogOpen(false);
       setRecordToDelete(null);
     },
-    [enableSoftDelete, softDelete]
+    [enableSoftDelete, softDelete, dataProvider, resource]
   );
 
   // Restore handler
@@ -367,14 +410,18 @@ export function EditableDataGrid<RecordType extends RaRecord = RaRecord>({
     [restore]
   );
 
-  // Bulk delete - uses soft delete
+  // Bulk delete - soft delete when enabled, hard delete otherwise
   const handleBulkDelete = useCallback(async () => {
     if (enableSoftDelete) {
       await bulkSoftDelete(selectedIds);
+    } else {
+      await Promise.all(
+        selectedIds.map((id) => dataProvider.delete(resource, { id })),
+      );
     }
     setSelectedIds([]);
     setDeleteDialogOpen(false);
-  }, [selectedIds, enableSoftDelete, bulkSoftDelete]);
+  }, [selectedIds, enableSoftDelete, bulkSoftDelete, dataProvider, resource]);
 
   // Bulk restore
   const handleBulkRestore = useCallback(async () => {
@@ -404,7 +451,7 @@ export function EditableDataGrid<RecordType extends RaRecord = RaRecord>({
   };
 
   return (
-    <Card className={cn("p-4", className)}>
+    <Card className={cn("p-4 max-w-full overflow-hidden", className)}>
       {/* Toolbar */}
       <div className="flex items-center justify-between mb-4 gap-4">
         <div className="flex items-center gap-2 flex-1">
@@ -517,7 +564,7 @@ export function EditableDataGrid<RecordType extends RaRecord = RaRecord>({
       </p>
 
       {/* Table */}
-      <div className="rounded-md border overflow-x-auto" ref={tableRef}>
+      <div className="rounded-md border overflow-x-auto max-w-full" ref={tableRef}>
         <Table className="w-full">
           <TableHeader>
             <TableRow>

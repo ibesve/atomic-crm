@@ -3,6 +3,8 @@ import { useGetList } from "ra-core";
 import type { RaRecord } from "ra-core";
 import type { EditableColumnDef } from "@/components/admin/editable-datagrid";
 import type { CustomFieldDefinition, CustomObjectDefinition } from "../types/custom-objects";
+import { useDynamicOptionsMap } from "@/hooks/useDynamicOptions";
+import { useTransitiveReferences } from "@/hooks/useTransitiveReferences";
 
 /**
  * Hook that returns EditableDataGrid columns for custom fields of a given entity type.
@@ -108,14 +110,57 @@ export function useCustomFieldColumns<RecordType extends RaRecord = RaRecord>(
     return map;
   }, [refContacts, refCompanies, refDeals, refSales, customRefTarget, refCustomData]);
 
+  // Load dynamic options for all select/multiselect fields
+  const selectFields = useMemo(
+    () => (fieldDefs || []).filter((f) => f.field_type === "select" || f.field_type === "multiselect"),
+    [fieldDefs]
+  );
+  const { optionsMap: dynamicOptionsMap } = useDynamicOptionsMap(selectFields);
+
+  // ── Transitive references (A→B→C) ────────────────────────
+  const refFieldDefs = useMemo(
+    () => (fieldDefs || []).filter((f) => f.field_type === "reference" && f.reference_object),
+    [fieldDefs],
+  );
+  const { getEnrichedLabel } = useTransitiveReferences(refFieldDefs, refDataMap);
+
+  // Helper to resolve template strings like "{first_name}, {last_name}" or plain field names
+  const resolveDisplayTemplate = (
+    template: string,
+    record: RaRecord,
+    dataObj?: Record<string, unknown>,
+  ): string | null => {
+    // Template syntax: contains {field_name} patterns
+    if (template.includes("{")) {
+      const result = template.replace(/\{(\w+)\}/g, (_, field) => {
+        // Try direct record field first, then data sub-object
+        const val = record[field] ?? dataObj?.[field];
+        return val != null ? String(val) : "";
+      });
+      return result.trim() || null;
+    }
+    // Plain field name (legacy): try record field, then data sub-object
+    const val = record[template] ?? dataObj?.[template];
+    return val != null ? String(val) : null;
+  };
+
   // Helper to get display label for a reference record
   const getRefLabel = (target: string, refRecord: RaRecord, displayField?: string | null): string => {
+    // If a display template/field is configured, use it
+    if (displayField) {
+      const dataObj = target.startsWith("custom_")
+        ? (refRecord.data || {}) as Record<string, unknown>
+        : undefined;
+      const resolved = resolveDisplayTemplate(displayField, refRecord, dataObj);
+      if (resolved) return resolved;
+    }
+    // Default fallback per target type
     if (target === "contacts" || target === "sales") {
       return [refRecord.first_name, refRecord.last_name].filter(Boolean).join(" ") || `#${refRecord.id}`;
     }
     if (target.startsWith("custom_")) {
       const d = (refRecord.data || {}) as Record<string, unknown>;
-      return String(d[displayField || "name"] || d.name || d.title || `#${refRecord.id}`);
+      return String(d.name || d.title || `#${refRecord.id}`);
     }
     return String(refRecord.name || refRecord.title || refRecord.label || `#${refRecord.id}`);
   };
@@ -192,31 +237,98 @@ export function useCustomFieldColumns<RecordType extends RaRecord = RaRecord>(
           const val = fieldValues?.[record.id as number];
           if (!val) return "-";
           const ref = refRecords.find((r) => String(r.id) === String(val));
-          return ref ? getRefLabel(target, ref, displayField) : String(val);
+          const baseLabel = ref ? getRefLabel(target, ref, displayField) : String(val);
+          return ref ? getEnrichedLabel(fieldDef.id, ref.id, baseLabel) : baseLabel;
         };
       } else if (
-        fieldDef.field_type === "select" &&
-        fieldDef.options &&
-        fieldDef.options.length > 0
+        fieldDef.field_type === "select" || fieldDef.field_type === "multiselect"
       ) {
-        col.type = "select";
-        col.options = fieldDef.options.map((o) => ({
-          value: o.value,
-          label: o.label,
-        }));
+        const resolvedOptions = dynamicOptionsMap[fieldDef.id] || fieldDef.options || [];
+        if (resolvedOptions.length > 0) {
+          col.type = "select";
+          col.options = resolvedOptions.map((o) => ({
+            value: o.value,
+            label: o.label,
+          }));
+        }
+        // Render override: resolve stored value(s) to option labels
+        col.render = (record) => {
+          const fieldValues = customFieldValues[String(fieldDef.id)];
+          const val = fieldValues?.[record.id as number];
+          if (val === null || val === undefined) return "-";
+          const lookup = (v: unknown): string => {
+            const s = String(v);
+            const opt = resolvedOptions.find((o) => String(o.value) === s);
+            return opt ? opt.label : s;
+          };
+          if (Array.isArray(val)) {
+            return val.map(lookup).join(", ");
+          }
+          return lookup(val);
+        };
       } else if (fieldDef.field_type === "number") {
         col.type = "number";
+      } else if (fieldDef.field_type === "date") {
+        col.type = "date";
+        col.editable = true;
+        col.getEditValue = (record) => {
+          const fieldValues = customFieldValues[String(fieldDef.id)];
+          const val = fieldValues?.[record.id as number];
+          return val ? String(val) : "";
+        };
+        col.render = (record) => {
+          const fieldValues = customFieldValues[String(fieldDef.id)];
+          const val = fieldValues?.[record.id as number];
+          if (!val) return "-";
+          try {
+            return new Date(String(val)).toLocaleDateString("de-DE");
+          } catch { return String(val); }
+        };
+      } else if (fieldDef.field_type === "datetime") {
+        col.type = "datetime";
+        col.editable = true;
+        col.getEditValue = (record) => {
+          const fieldValues = customFieldValues[String(fieldDef.id)];
+          const val = fieldValues?.[record.id as number];
+          if (!val) return "";
+          // Convert to local datetime-local format (YYYY-MM-DDTHH:mm)
+          try {
+            const d = new Date(String(val));
+            return d.toISOString().slice(0, 16);
+          } catch { return String(val); }
+        };
+        col.render = (record) => {
+          const fieldValues = customFieldValues[String(fieldDef.id)];
+          const val = fieldValues?.[record.id as number];
+          if (!val) return "-";
+          try {
+            return new Date(String(val)).toLocaleString("de-DE");
+          } catch { return String(val); }
+        };
       } else {
         col.type = "text";
       }
 
       return col;
     });
+  }, [fieldDefs, customFieldValues, refDataMap, dynamicOptionsMap, getEnrichedLabel]);
+
+  // Build a lookup keyed by _cf_<name> → { entityId: value }
+  // This lets client-side filters resolve CF values without relying on afterRead.
+  const cfValuesBySource = useMemo(() => {
+    const result: Record<string, Record<number, unknown>> = {};
+    if (!fieldDefs) return result;
+    for (const fieldDef of fieldDefs) {
+      const source = `_cf_${fieldDef.name}`;
+      result[source] = customFieldValues[String(fieldDef.id)] || {};
+    }
+    return result;
   }, [fieldDefs, customFieldValues]);
 
   return {
     columns,
     customFieldValues,
+    cfValuesBySource,
     isLoading: defsLoading || valuesLoading,
   };
 }

@@ -1,13 +1,10 @@
 import { useState } from "react";
-import { Trash2, RotateCcw, Loader2 } from "lucide-react";
+import { Trash2, Loader2 } from "lucide-react";
 import {
   useTranslate,
-  useResourceContext,
-  useListContext,
 } from "ra-core";
 import { useGetListDeleted } from "@react-admin/ra-core-ee";
 import type { DeletedRecordType } from "@react-admin/ra-core-ee";
-import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -123,6 +120,7 @@ export function DeletedRecordsList({
                   </div>
                   <div className="flex items-center gap-2 ml-4">
                     <RestoreButton
+                      record={record}
                       size="sm"
                       variant="ghost"
                     />

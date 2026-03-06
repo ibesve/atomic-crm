@@ -172,6 +172,10 @@
           "type": "registry:component"
         },
         {
+          "path": "src/components/atomic-crm/root/DeletedRecordsPage.tsx",
+          "type": "registry:component"
+        },
+        {
           "path": "src/components/atomic-crm/root/ConfigurationContext.tsx",
           "type": "registry:component"
         },
@@ -184,7 +188,19 @@
           "type": "registry:component"
         },
         {
+          "path": "src/components/atomic-crm/rbac/UserRoleAssignment.tsx",
+          "type": "registry:component"
+        },
+        {
           "path": "src/components/atomic-crm/rbac/UserAttributesManager.tsx",
+          "type": "registry:component"
+        },
+        {
+          "path": "src/components/atomic-crm/rbac/UnifiedAbacManager.tsx",
+          "type": "registry:component"
+        },
+        {
+          "path": "src/components/atomic-crm/rbac/TeamRoleAssignment.tsx",
           "type": "registry:component"
         },
         {
@@ -396,6 +412,10 @@
           "type": "registry:component"
         },
         {
+          "path": "src/components/atomic-crm/notes/AddNote.tsx",
+          "type": "registry:component"
+        },
+        {
           "path": "src/components/atomic-crm/misc/usePapaParse.tsx",
           "type": "registry:component"
         },
@@ -532,6 +552,10 @@
           "type": "registry:component"
         },
         {
+          "path": "src/components/atomic-crm/layout/AppSidebar.tsx",
+          "type": "registry:component"
+        },
+        {
           "path": "src/components/atomic-crm/filters/FilterCategory.tsx",
           "type": "registry:component"
         },
@@ -660,6 +684,10 @@
           "type": "registry:component"
         },
         {
+          "path": "src/components/atomic-crm/custom-objects/RelationshipsPage.tsx",
+          "type": "registry:component"
+        },
+        {
           "path": "src/components/atomic-crm/custom-objects/RelationshipManager.tsx",
           "type": "registry:component"
         },
@@ -672,11 +700,23 @@
           "type": "registry:component"
         },
         {
+          "path": "src/components/atomic-crm/custom-objects/CustomObjectQuickView.tsx",
+          "type": "registry:component"
+        },
+        {
+          "path": "src/components/atomic-crm/custom-objects/CustomObjectListPage.tsx",
+          "type": "registry:component"
+        },
+        {
           "path": "src/components/atomic-crm/custom-objects/CustomFieldsSection.tsx",
           "type": "registry:component"
         },
         {
           "path": "src/components/atomic-crm/custom-objects/CustomFieldsManager.tsx",
+          "type": "registry:component"
+        },
+        {
+          "path": "src/components/atomic-crm/custom-objects/CustomFieldsDisplay.tsx",
           "type": "registry:component"
         },
         {

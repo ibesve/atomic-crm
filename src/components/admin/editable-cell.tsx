@@ -27,7 +27,7 @@ interface EditableCellProps<RecordType extends RaRecord = RaRecord> {
   source: string;
   resource: string;
   children?: ReactNode;
-  type?: "text" | "number" | "select" | "reference" | "boolean";
+  type?: "text" | "number" | "select" | "reference" | "boolean" | "date" | "datetime";
   options?: { value: string; label: string }[];
   referenceData?: RaRecord[];
   renderDisplay?: (value: unknown, record: RecordType) => ReactNode;
@@ -287,7 +287,7 @@ export function EditableCell<RecordType extends RaRecord = RaRecord>({
             </Select>
           ) : (
             <Input
-              type={type}
+              type={type === "datetime" ? "datetime-local" : type}
               value={value ?? ""}
               onChange={(e) =>
                 setValue(type === "number" ? parseFloat(e.target.value) : e.target.value)

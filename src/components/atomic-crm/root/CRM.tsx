@@ -23,6 +23,7 @@ const SettingsPage = lazy(() => import("../settings/SettingsPage").then(m => ({ 
 const ImportPage = lazy(() => import("../misc/ImportPage").then(m => ({ default: m.ImportPage })));
 const ContactDataGrid = lazy(() => import("../contacts/ContactDataGrid").then(m => ({ default: m.ContactDataGrid })));
 const CompanyDataGrid = lazy(() => import("../companies/CompanyDataGrid").then(m => ({ default: m.CompanyDataGrid })));
+const GenericDataGrid = lazy(() => import("../GenericDataGrid").then(m => ({ default: m.GenericDataGrid })));
 const ContactShow = lazy(() => import("../contacts/ContactShow").then(m => ({ default: m.ContactShow })));
 const CompanyShow = lazy(() => import("../companies/CompanyShow").then(m => ({ default: m.CompanyShow })));
 const NoteShowPage = lazy(() => import("../notes/NoteShowPage").then(m => ({ default: m.NoteShowPage })));
@@ -222,8 +223,9 @@ const DesktopAdmin = (props: CoreAdminProps) => {
         <Route path="/settings" element={<SuspenseWrapper><SettingsPage /></SuspenseWrapper>} />
         <Route path="/import" element={<SuspenseWrapper><ImportPage /></SuspenseWrapper>} />
         <Route path="/admin/settings" element={<SuspenseWrapper><AdminSettingsPage /></SuspenseWrapper>} />
-        <Route path="/contacts-quickview" element={<SuspenseWrapper><ContactDataGrid /></SuspenseWrapper>} />
-        <Route path="/companies-quickview" element={<SuspenseWrapper><CompanyDataGrid /></SuspenseWrapper>} />
+        <Route path="/contacts-quickview" element={<SuspenseWrapper><GenericDataGrid key="contacts" resource="contacts" entityType="contacts" enableSoftDelete /></SuspenseWrapper>} />
+        <Route path="/companies-quickview" element={<SuspenseWrapper><GenericDataGrid key="companies" resource="companies" entityType="companies" enableSoftDelete /></SuspenseWrapper>} />
+        <Route path="/deals-quickview" element={<SuspenseWrapper><GenericDataGrid key="deals" resource="deals" entityType="deals" enableSoftDelete /></SuspenseWrapper>} />
         <Route path="/audit" element={<SuspenseWrapper><AuditLogPage /></SuspenseWrapper>} />
         <Route path="/deleted" element={<SuspenseWrapper><DeletedRecordsPage /></SuspenseWrapper>} />
         <Route path="/relationships" element={<SuspenseWrapper><RelationshipsPage /></SuspenseWrapper>} />
@@ -258,6 +260,7 @@ const DesktopAdmin = (props: CoreAdminProps) => {
       <Resource name="events" />
       <Resource name="locks" />
       <Resource name="categories" />
+      <Resource name="saved_views" />
     </Admin>
   );
 };

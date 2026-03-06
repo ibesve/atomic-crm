@@ -300,11 +300,19 @@ const processCompanyLogo = async (params: any) => {
 const dataProviderWithCustomMethods = {
   ...baseDataProvider,
   async getList(resource: string, params: GetListParams) {
+    // Safety net: strip any _cf_* keys from filter — they are custom-field
+    // names that don't exist as columns on the PostgreSQL views and would
+    // cause PostgREST to return 400. CF filtering happens client-side.
+    const rawFilter = params.filter ?? {};
+    const cleanedFilter = Object.fromEntries(
+      Object.entries(rawFilter).filter(([k]) => !k.startsWith("_cf_")),
+    );
+
     // Auto-filter soft-deleted records for soft-deletable resources
     const sdCfg = SOFT_DELETABLE_RESOURCES[resource];
     const filter = sdCfg
-      ? { ...params.filter, [`${sdCfg.deletedAtFieldName}@is`]: "null" }
-      : params.filter;
+      ? { ...cleanedFilter, [`${sdCfg.deletedAtFieldName}@is`]: "null" }
+      : cleanedFilter;
     const patchedParams = { ...params, filter };
 
     if (resource === "companies") {
