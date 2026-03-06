@@ -36,6 +36,26 @@
           "type": "registry:component"
         },
         {
+          "path": "src/components/atomic-crm/column-registry.tsx",
+          "type": "registry:component"
+        },
+        {
+          "path": "src/components/atomic-crm/SavedViewsManager.tsx",
+          "type": "registry:component"
+        },
+        {
+          "path": "src/components/atomic-crm/GenericDataGrid.tsx",
+          "type": "registry:component"
+        },
+        {
+          "path": "src/components/atomic-crm/ExportToolbar.tsx",
+          "type": "registry:component"
+        },
+        {
+          "path": "src/components/atomic-crm/AdvancedFilterBuilder.tsx",
+          "type": "registry:component"
+        },
+        {
           "path": "src/components/atomic-crm/types/rbac.ts",
           "type": "registry:component"
         },
@@ -949,6 +969,14 @@
         },
         {
           "path": "src/hooks/user-menu-context.tsx",
+          "type": "registry:hook"
+        },
+        {
+          "path": "src/hooks/useTransitiveReferences.ts",
+          "type": "registry:hook"
+        },
+        {
+          "path": "src/hooks/useDynamicOptions.ts",
           "type": "registry:hook"
         },
         {
